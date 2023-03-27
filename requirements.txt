@@ -1,0 +1,3 @@
+pathlib>=1.0.1
+python-efl>=1.26.0
+audio-metadata>=0.11.1
