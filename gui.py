@@ -2,11 +2,55 @@ from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Labe
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
+from binascii import b2a_hex
+from os import urandom, path
+import player
+
+PLACEHOLDER_IMG = path.abspath("img/202377.png")
 
 class MainWindow(StandardWindow):
     def __init__(self) -> None:
-        super().__init__("main", "Ewave", autodel=True, borderless=False, size=(1080,720))
+        super().__init__("main", "Ewave", autodel=True, borderless=False, size=(1200,800))
         self.callback_delete_request_add(lambda o: elm_exit())
+
+class HeaderButton(Button):
+    def __init__(self, parent, content, text) -> None:
+        super().__init__(parent, content=content, text=text, style="anchor", scale=1.2)
+
+class MetaTextDisplay(Label):
+    def __init__(self, parent, text) -> None:
+        super().__init__(parent, text=F"<b>{text}</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
+
+class PlayerController(Box):
+    def __init__(self, parent) -> None:
+        super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
+
+        # Elements
+        ic_prev = Icon(self, standard="media_player/prev")
+        self.prev = Button(self, content=ic_prev, scale=1.8)
+        self.pack_end(self.prev)
+
+        ic_play = Icon(self, standard="media_player/play")
+        self.play = Button(self, content=ic_play, scale=1.8)
+        self.pack_end(self.play)
+
+        ic_next = Icon(self, standard="media_player/next")
+        self.b_next = Button(self, content=ic_next, scale=1.8)
+        self.pack_end(self.b_next)
+
+        ic_stop = Icon(self, standard="media_player/stop")
+        self.stop = Button(self, content=ic_stop, scale=1.8)
+        self.stop.callback_pressed_add(stop_player)
+        self.pack_end(self.stop)
+
+        self.prev.show()
+        self.play.show()
+        self.b_next.show()
+        self.stop.show()
+
+        # Misc
+        self.stopped = False
+
 
 def ch_progress(obj):
     duration = playback.play_length_get()
@@ -20,23 +64,59 @@ def ch_progress(obj):
 def playing_icon(ic):
     return "media_player/play" if ic == "media_player/pause" else "media_player/pause"
 
-def ch_playpause(obj):
+def ch_playpause(obj, title, album, artist):
+    if player_controls.stopped:
+        meta = player.get_metadata(playback.file_get())
+        set_metadata(title, album, artist, meta)
+        player_controls.stopped = False
     obj.content_get().standard_set(playing_icon(obj.content_get().standard_get()))
     playback.play_set(not playback.play_get())
 
+def stop_player(obj):
+    playback.play_set(False)
+    cover.file_set(PLACEHOLDER_IMG)
+    play_button = player_controls.play
+    player_controls.stopped = True
+    play_button.content_get().standard_set("media_player/play")
+    playing.child_get(0, 4).text_set("<b>Nothing playing!</b>")
+    playing.child_get(0, 5).text_set(" ")
+    playing.child_get(0, 6).text_set(" ")
+    time_bar.value_set(0)
+    playback.position_set(0)
+
+def load_test(obj):
+    print("File loaded")
+
+def set_metadata(title_zone, album_zone, artist_zone, meta):
+    # this is very ugly and dumb but for some reasons efl's Image with memfile_set wouldn't work so it's the only way I found 
+    # to display the image from the audio metadata
+    tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
+    with open(tmp_filename_bin, "wb") as raw_img:
+        raw_img.write(meta["pictures"][0].data)
+    #cover.memfile_set(meta["pictures"][0].data, len(meta["pictures"][0].data), format="jpeg") why no work ??????
+    cover.file_set(tmp_filename_bin)
+    title_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
+    try:
+        album_zone.text_set(F"<b>{meta['tags'].album[0]}</b>")
+    except AttributeError:
+        album_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
+    artist_zone.text_set(F"<b>{meta['tags'].artist[0]}</b>")
+
 def init_gui():
-    global win, vbx, header, main, cover, time_bar, playing, playback
+    global win, vbx, header, main, cover, time_bar, playing, playback, player_controls
     win = MainWindow()
     playback = Emotion(win.evas, module_name="vlc")
+    playback.on_open_done_add(load_test)
+
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
     win.resize_object_add(vbx)
     vbx.show()
     #### Header Box #####
     header = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, horizontal=True, align=(0,1), size_hint_align=evas.FILL_BOTH)
     ic_home = Icon(header, standard="user-home")
-    home = Button(header, text="Home", content=ic_home, style="anchor", scale=1.2)
+    home = HeaderButton(header, text="Home", content=ic_home)
     ic_playlist = Icon(header, standard="media-eject")
-    playlist = Button(header, text="Playlists", content=ic_playlist, style="anchor", scale=1.2)
+    playlist = HeaderButton(header, text="Playlists", content=ic_playlist)
     header.pack_end(home)
     header.pack_end(playlist)
 
@@ -50,10 +130,10 @@ def init_gui():
     main = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
     playing = Table(main, size_hint_weight=evas.EXPAND_BOTH)
     playing.show()
-    cover = Photo(main, size=500, size_hint_weight=evas.EXPAND_BOTH, editable=False, fill_inside=False)
-    title = Label(main, text="<b>Title</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
-    album = Label(main, text="<b>Album</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
-    artist = Label(main, text="<b>Artist</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
+    cover = Photo(main, size=500, size_hint_weight=evas.EXPAND_BOTH, editable=False, fill_inside=False, file=PLACEHOLDER_IMG)
+    title = MetaTextDisplay(main, text="Nothing Playing!")
+    album = MetaTextDisplay(main, text=" ")
+    artist = MetaTextDisplay(main, text=" ")
 
     album.show()
     title.show()
@@ -74,31 +154,8 @@ def init_gui():
     win.show()
 
     #### Player Buttons ####
-    player_controls = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
-    ic_prev = Icon(player_controls, standard="media_player/prev")
-    prev = Button(player_controls, content=ic_prev, scale=1.8)
-    player_controls.pack_end(prev)
-
-    ic_play = Icon(player_controls, standard="media_player/play")
-    play = Button(player_controls, content=ic_play, scale=1.8)
-    play.callback_pressed_add(ch_playpause)
-    player_controls.pack_end(play)
-
-    ic_next = Icon(player_controls, standard="media_player/next")
-    b_next = Button(player_controls, content=ic_next, scale=1.8)
-    player_controls.pack_end(b_next)
-
-    ic_stop = Icon(player_controls, standard="media_player/stop")
-    stop = Button(player_controls, content=ic_stop, scale=1.8)
-    stop.callback_pressed_add(lambda x: playback.play_set(False))
-    player_controls.pack_end(stop)
-    
-    stop.show()
-    b_next.show()
-    play.show()
-    prev.show()
+    player_controls = PlayerController(vbx)
+    player_controls.play.callback_pressed_add(ch_playpause, title, album, artist)
     player_controls.show()
     vbx.pack_end(player_controls)
     playback.on_position_update_add(ch_progress)
-
-    #return [win, header, vbx, main, playing, cover, time_bar] # this is done to access them later when we need to edit some of them
