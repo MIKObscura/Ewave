@@ -26,18 +26,22 @@ class PlayerController(Box):
         super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
 
         # Elements
+        # Previous
         ic_prev = Icon(self, standard="media_player/prev")
         self.prev = Button(self, content=ic_prev, scale=1.8)
         self.pack_end(self.prev)
 
+        # Play/Pause
         ic_play = Icon(self, standard="media_player/play")
         self.play = Button(self, content=ic_play, scale=1.8)
         self.pack_end(self.play)
 
+        # Next
         ic_next = Icon(self, standard="media_player/next")
         self.b_next = Button(self, content=ic_next, scale=1.8)
         self.pack_end(self.b_next)
 
+        # Stop
         ic_stop = Icon(self, standard="media_player/stop")
         self.stop = Button(self, content=ic_stop, scale=1.8)
         self.stop.callback_pressed_add(stop_player)
@@ -53,6 +57,9 @@ class PlayerController(Box):
 
 
 def ch_progress(obj):
+    """
+    Updates the progressbar based on the position in the file
+    """
     duration = playback.play_length_get()
     position = playback.position_get()
     try:
@@ -62,9 +69,16 @@ def ch_progress(obj):
         return
 
 def playing_icon(ic):
+    """
+    Switches between play and pause icons
+    """
     return "media_player/play" if ic == "media_player/pause" else "media_player/pause"
 
 def ch_playpause(obj, title, album, artist):
+    """
+    Sets the play state and icon of the play/pause icon
+    If the player was stopped, set the audio metadata
+    """
     if player_controls.stopped:
         meta = player.get_metadata(playback.file_get())
         set_metadata(title, album, artist, meta)
@@ -73,6 +87,9 @@ def ch_playpause(obj, title, album, artist):
     playback.play_set(not playback.play_get())
 
 def stop_player(obj):
+    """
+    Stops the player and removes the audio metadata display
+    """
     playback.play_set(False)
     cover.file_set(PLACEHOLDER_IMG)
     play_button = player_controls.play
@@ -84,10 +101,10 @@ def stop_player(obj):
     time_bar.value_set(0)
     playback.position_set(0)
 
-def load_test(obj):
-    print("File loaded")
-
 def set_metadata(title_zone, album_zone, artist_zone, meta):
+    """
+    Puts the audio metadata in the window
+    """
     # this is very ugly and dumb but for some reasons efl's Image with memfile_set wouldn't work so it's the only way I found 
     # to display the image from the audio metadata
     tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
@@ -106,7 +123,7 @@ def init_gui():
     global win, vbx, header, main, cover, time_bar, playing, playback, player_controls
     win = MainWindow()
     playback = Emotion(win.evas, module_name="vlc")
-    playback.on_open_done_add(load_test)
+    #playback.on_open_done_add(load_test)
 
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
     win.resize_object_add(vbx)
