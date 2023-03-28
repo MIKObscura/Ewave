@@ -1,4 +1,4 @@
-from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar
+from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
@@ -47,15 +47,23 @@ class PlayerController(Box):
         self.stop.callback_pressed_add(stop_player)
         self.pack_end(self.stop)
 
+        # Volume Slider
+        self.volume = Slider(self, horizontal=True, span_size=100, value=1.0)
+        self.volume.callback_changed_add(ch_volume)
+        self.pack_end(self.volume)
+
         self.prev.show()
         self.play.show()
         self.b_next.show()
         self.stop.show()
+        self.volume.show()
 
         # Misc
         self.stopped = False
 
-
+"""
+Functions used for callbacks
+"""
 def ch_progress(obj):
     """
     Updates the progressbar based on the position in the file
@@ -119,6 +127,14 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
         album_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
     artist_zone.text_set(F"<b>{meta['tags'].artist[0]}</b>")
 
+def ch_volume(obj):
+    new_vol = obj.value_get()
+    playback.audio_volume_set(new_vol)
+
+
+"""
+Initialize everything
+"""
 def init_gui():
     global win, vbx, header, main, cover, time_bar, playing, playback, player_controls
     win = MainWindow()
@@ -155,9 +171,9 @@ def init_gui():
     album.show()
     title.show()
     artist.show()
-    playing.pack(artist, 0, 4, 1, 1)
+    playing.pack(title, 0, 4, 1, 1)
     playing.pack(album, 0, 5, 1, 1)
-    playing.pack(title, 0, 6, 1, 1)
+    playing.pack(artist, 0, 6, 1, 1)
     main.show()
     vbx.pack_start(main)
     main.pack_end(playing)
