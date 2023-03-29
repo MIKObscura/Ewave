@@ -1,10 +1,10 @@
-from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider
+from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
 from binascii import b2a_hex
 from os import urandom, path
-import player
+import player_utils
 
 PLACEHOLDER_IMG = path.abspath("img/202377.png")
 
@@ -15,11 +15,15 @@ class MainWindow(StandardWindow):
 
 class HeaderButton(Button):
     def __init__(self, parent, content, text) -> None:
-        super().__init__(parent, content=content, text=text, style="anchor", scale=1.2)
+        super().__init__(parent, content=content, text=text, style="anchor", scale=1.2, autorepeat=False)
 
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
         super().__init__(parent, text=F"<b>{text}</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
+
+class DirPicker(Fileselector, FileselectorButton):
+    def __init__(self, parent) -> None:
+        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select folder", folder_only=True)
 
 class PlayerController(Box):
     def __init__(self, parent) -> None:
@@ -29,6 +33,7 @@ class PlayerController(Box):
         # Previous
         ic_prev = Icon(self, standard="media_player/prev")
         self.prev = Button(self, content=ic_prev, scale=1.8)
+        self.prev.callback_pressed_add(play_prev)
         self.pack_end(self.prev)
 
         # Play/Pause
@@ -39,6 +44,7 @@ class PlayerController(Box):
         # Next
         ic_next = Icon(self, standard="media_player/next")
         self.b_next = Button(self, content=ic_next, scale=1.8)
+        self.b_next.callback_pressed_add(play_next)
         self.pack_end(self.b_next)
 
         # Stop
@@ -60,6 +66,37 @@ class PlayerController(Box):
 
         # Misc
         self.stopped = False
+        self.player_queue = None
+        self.current_track = 0
+
+    def get_current_track(self):
+        if self.player_queue is None:
+            return None
+        return self.player_queue[self.current_track]
+
+
+class MainBoxDisplayPlaying(Box):
+    def __init__(self, parent) -> None:
+        super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
+        self.playing = Table(self, size_hint_weight=evas.EXPAND_BOTH)
+        self.playing.show()
+        self.cover = Photo(self, size=500, size_hint_weight=evas.EXPAND_BOTH, editable=False, fill_inside=False, file=PLACEHOLDER_IMG)
+        self.title = MetaTextDisplay(self, text="Nothing Playing!")
+        self.album = MetaTextDisplay(self, text=" ")
+        self.artist = MetaTextDisplay(self, text=" ")
+
+        self.album.show()
+        self.title.show()
+        self.artist.show()
+        self.cover.show()
+
+        self.playing.pack(self.title, 0, 4, 1, 1)
+        self.playing.pack(self.album, 0, 5, 1, 1)
+        self.playing.pack(self.artist, 0, 6, 1, 1)
+
+        self.show()
+        self.pack_end(self.playing)
+        self.pack_start(self.cover)
 
 """
 Functions used for callbacks
@@ -88,7 +125,8 @@ def ch_playpause(obj, title, album, artist):
     If the player was stopped, set the audio metadata
     """
     if player_controls.stopped:
-        meta = player.get_metadata(playback.file_get())
+        playback.file_set(str(player_controls.get_current_track()))
+        meta = player_utils.get_metadata(playback.file_get())
         set_metadata(title, album, artist, meta)
         player_controls.stopped = False
     obj.content_get().standard_set(playing_icon(obj.content_get().standard_get()))
@@ -98,16 +136,18 @@ def stop_player(obj):
     """
     Stops the player and removes the audio metadata display
     """
-    playback.play_set(False)
-    cover.file_set(PLACEHOLDER_IMG)
+    main.cover.file_set(PLACEHOLDER_IMG)
     play_button = player_controls.play
     player_controls.stopped = True
     play_button.content_get().standard_set("media_player/play")
-    playing.child_get(0, 4).text_set("<b>Nothing playing!</b>")
-    playing.child_get(0, 5).text_set(" ")
-    playing.child_get(0, 6).text_set(" ")
+    main.title.text_set("<b>Nothing playing!</b>")
+    main.album.text_set(" ")
+    main.artist.text_set(" ")
     time_bar.value_set(0)
     playback.position_set(0)
+    playback.play_set(False)
+    playback.file_set(None)
+    player_controls.current_track = 0
 
 def set_metadata(title_zone, album_zone, artist_zone, meta):
     """
@@ -119,7 +159,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
     with open(tmp_filename_bin, "wb") as raw_img:
         raw_img.write(meta["pictures"][0].data)
     #cover.memfile_set(meta["pictures"][0].data, len(meta["pictures"][0].data), format="jpeg") why no work ??????
-    cover.file_set(tmp_filename_bin)
+    main.cover.file_set(tmp_filename_bin)
     title_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
     try:
         album_zone.text_set(F"<b>{meta['tags'].album[0]}</b>")
@@ -128,15 +168,64 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
     artist_zone.text_set(F"<b>{meta['tags'].artist[0]}</b>")
 
 def ch_volume(obj):
+    """
+    Change the volume
+    """
     new_vol = obj.value_get()
     playback.audio_volume_set(new_vol)
 
+def set_dir(obj, event_info):
+    """
+    Sets the current directory and populate the play queue with it
+    """
+    files = player_utils.filter_files(player_utils.get_all_files(event_info))
+    if len(files) == 0: # no audio file in directory
+        return
+    player_controls.player_queue = files
+    queue_start = player_controls.player_queue[player_controls.current_track]
+    playback.file_set(str(queue_start))
+    playback.play_set(False)
+    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(queue_start))
+
+def play_next(obj):
+    """
+    play the next track in the queue, stop the player if none after
+    """
+    try:
+        player_controls.current_track += 1
+        new_track = player_controls.get_current_track()
+        playback.file_set(str(new_track))
+        set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(new_track))
+        player_controls.play.content_get().standard_set("media_player/pause")
+    except IndexError:
+        stop_player(obj)
+
+def play_prev(obj):
+    """
+    play the previous track,
+    or go back to the beginning of the current track if 
+    no track before or at more than 30% of the track
+    """
+    if time_bar.value_get() > 0.3:
+        time_bar.value_set(0)
+        playback.position_set(0)
+        return
+    player_controls.current_track -= 1
+    prev_track = None
+    player_controls.play.content_get().standard_set("media_player/pause")
+    try:
+        prev_track = player_controls.get_current_track()
+        playback.file_set(str(prev_track))
+        set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(prev_track))
+    except IndexError:
+        time_bar.value_set(0)
+        playback.position_set(0)
 
 """
 Initialize everything
 """
 def init_gui():
-    global win, vbx, header, main, cover, time_bar, playing, playback, player_controls
+    global win, vbx, header, main, time_bar, playback, player_controls
     win = MainWindow()
     playback = Emotion(win.evas, module_name="vlc")
     #playback.on_open_done_add(load_test)
@@ -148,47 +237,36 @@ def init_gui():
     header = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, horizontal=True, align=(0,1), size_hint_align=evas.FILL_BOTH)
     ic_home = Icon(header, standard="user-home")
     home = HeaderButton(header, text="Home", content=ic_home)
-    ic_playlist = Icon(header, standard="media-eject")
-    playlist = HeaderButton(header, text="Playlists", content=ic_playlist)
+    ic_playing = Icon(header, standard="media_player/play")
+    playing = HeaderButton(header, text="Playing", content=ic_playing)
+    fs = DirPicker(header)
+    fs.callback_file_chosen_add(set_dir)
     header.pack_end(home)
-    header.pack_end(playlist)
+    header.pack_end(playing)
+    header.pack_end(fs)
 
-    playlist.show()
-    ic_playlist.show()
+    playing.show()
+    ic_playing.show()
     home.show()
     ic_home.show()
+    fs.show()
     header.show()
 
     #### Main Box #####
-    main = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
-    playing = Table(main, size_hint_weight=evas.EXPAND_BOTH)
-    playing.show()
-    cover = Photo(main, size=500, size_hint_weight=evas.EXPAND_BOTH, editable=False, fill_inside=False, file=PLACEHOLDER_IMG)
-    title = MetaTextDisplay(main, text="Nothing Playing!")
-    album = MetaTextDisplay(main, text=" ")
-    artist = MetaTextDisplay(main, text=" ")
-
-    album.show()
-    title.show()
-    artist.show()
-    playing.pack(title, 0, 4, 1, 1)
-    playing.pack(album, 0, 5, 1, 1)
-    playing.pack(artist, 0, 6, 1, 1)
-    main.show()
+    main = MainBoxDisplayPlaying(vbx)
     vbx.pack_start(main)
-    main.pack_end(playing)
-    main.pack_start(cover)
-    cover.show()
 
     #### Progress Bar ####
     time_bar = Progressbar(vbx, horizontal=True, value=0, size_hint_align=evas.FILL_HORIZ, size_hint_weight=evas.EXPAND_BOTH)
     time_bar.show()
     vbx.pack_end(time_bar)
-    win.show()
 
     #### Player Buttons ####
     player_controls = PlayerController(vbx)
-    player_controls.play.callback_pressed_add(ch_playpause, title, album, artist)
+    player_controls.play.callback_pressed_add(ch_playpause, main.title, main.album, main.artist)
     player_controls.show()
     vbx.pack_end(player_controls)
     playback.on_position_update_add(ch_progress)
+    #home.callback_clicked_add(ch_main_home, main_display, main)
+    #playing.callback_clicked_add(ch_main_playing, main_display, main)
+    win.show()

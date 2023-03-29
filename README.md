@@ -1,7 +1,7 @@
 # Ewave
 This is an EFL based music player I decided to make to learn how to use this library because I think it looks good.  
 For now it's still in early development so it only has the basics of a music player.  
-To launch it, give the absolute path to an audio file to the `FILE` variable in `main.py` then launch it with your python interpreter
+To use it, launch `main.py` with your python interpreter, then click the select folder button and pick a directory that contains audio files, all the audio files in that directory will be put inside a play queue which will be used to control what's playing.
 
 # Requirements
 A few things are needed in order for the program to run, the python packages are in requirements.txt but there are other dependencies:
