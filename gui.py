@@ -156,10 +156,14 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
     # this is very ugly and dumb but for some reasons efl's Image with memfile_set wouldn't work so it's the only way I found 
     # to display the image from the audio metadata
     tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
-    with open(tmp_filename_bin, "wb") as raw_img:
-        raw_img.write(meta["pictures"][0].data)
+    try:
+        cover_data = meta["pictures"][0].data
+        with open(tmp_filename_bin, "wb") as raw_img:
+            raw_img.write(cover_data)
+        main.cover.file_set(tmp_filename_bin)
+    except IndexError:
+        main.cover.file_set(PLACEHOLDER_IMG)
     #cover.memfile_set(meta["pictures"][0].data, len(meta["pictures"][0].data), format="jpeg") why no work ??????
-    main.cover.file_set(tmp_filename_bin)
     title_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
     try:
         album_zone.text_set(F"<b>{meta['tags'].album[0]}</b>")
