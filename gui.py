@@ -1,4 +1,5 @@
 from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton
+from efl.elementary import ELM_WRAP_CHAR
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
@@ -19,7 +20,7 @@ class HeaderButton(Button):
 
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
-        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", size=(200, 50))
+        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_CHAR)
 
 class DirPicker(Fileselector, FileselectorButton):
     def __init__(self, parent) -> None:
