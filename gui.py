@@ -19,7 +19,7 @@ class HeaderButton(Button):
 
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
-        super().__init__(parent, text=F"<b>{text}</b>", size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2)
+        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", size=(200, 50))
 
 class DirPicker(Fileselector, FileselectorButton):
     def __init__(self, parent) -> None:
@@ -140,7 +140,7 @@ def stop_player(obj):
     play_button = player_controls.play
     player_controls.stopped = True
     play_button.content_get().standard_set("media_player/play")
-    main.title.text_set("<b>Nothing playing!</b>")
+    main.title.text_set("Nothing playing!")
     main.album.text_set(" ")
     main.artist.text_set(" ")
     time_bar.value_set(0)
@@ -164,12 +164,12 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
     except IndexError:
         main.cover.file_set(PLACEHOLDER_IMG)
     #cover.memfile_set(meta["pictures"][0].data, len(meta["pictures"][0].data), format="jpeg") why no work ??????
-    title_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
+    title_zone.text_set(meta['tags'].title[0])
     try:
-        album_zone.text_set(F"<b>{meta['tags'].album[0]}</b>")
+        album_zone.text_set(meta['tags'].album[0])
     except AttributeError:
-        album_zone.text_set(F"<b>{meta['tags'].title[0]}</b>")
-    artist_zone.text_set(F"<b>{meta['tags'].artist[0]}</b>")
+        album_zone.text_set(meta['tags'].title[0])
+    artist_zone.text_set(meta['tags'].artist[0])
 
 def ch_volume(obj):
     """
@@ -189,6 +189,8 @@ def set_dir(obj, event_info):
         player_controls.player_queue = sorted(files, key=lambda f: int(player_utils.get_metadata(f)["tags"].tracknumber[0]))
     except AttributeError:
         player_controls.player_queue = files
+    except ValueError:
+        player_controls.player_queue = files
     queue_start = player_controls.player_queue[player_controls.current_track]
     playback.file_set(str(queue_start))
     playback.play_set(False)
@@ -204,6 +206,7 @@ def play_next(obj):
         playback.file_set(str(new_track))
         set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(new_track))
         player_controls.play.content_get().standard_set("media_player/pause")
+        playback.play_set(True)
     except IndexError:
         stop_player(obj)
 
@@ -220,6 +223,7 @@ def play_prev(obj):
     player_controls.current_track -= 1
     prev_track = None
     player_controls.play.content_get().standard_set("media_player/pause")
+    playback.play_set(True)
     try:
         prev_track = player_controls.get_current_track()
         playback.file_set(str(prev_track))
