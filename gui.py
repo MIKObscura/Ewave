@@ -185,7 +185,10 @@ def set_dir(obj, event_info):
     files = player_utils.filter_files(player_utils.get_all_files(event_info))
     if len(files) == 0: # no audio file in directory
         return
-    player_controls.player_queue = files
+    try:
+        player_controls.player_queue = sorted(files, key=lambda f: int(player_utils.get_metadata(f)["tags"].tracknumber[0]))
+    except AttributeError:
+        player_controls.player_queue = files
     queue_start = player_controls.player_queue[player_controls.current_track]
     playback.file_set(str(queue_start))
     playback.play_set(False)
