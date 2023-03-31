@@ -1,13 +1,20 @@
 from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton
-from efl.elementary import ELM_WRAP_CHAR
+from efl.elementary import ELM_WRAP_WORD
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
 from binascii import b2a_hex
 from os import urandom, path
+from math import isclose
 import player_utils
+import cue
 
 PLACEHOLDER_IMG = path.abspath("img/202377.png")
+PLAY_MODES = {
+    "DIR": 1,
+    "CUE": 2,
+    "PLAYLIST": 3
+}
 
 class MainWindow(StandardWindow):
     def __init__(self) -> None:
@@ -20,11 +27,15 @@ class HeaderButton(Button):
 
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
-        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_CHAR)
+        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_WORD)
 
 class DirPicker(Fileselector, FileselectorButton):
     def __init__(self, parent) -> None:
         FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select folder", folder_only=True)
+
+class CuePicker(Fileselector, FileselectorButton):
+    def __init__(self, parent) -> None:
+        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select cue")
 
 class PlayerController(Box):
     def __init__(self, parent) -> None:
@@ -68,12 +79,19 @@ class PlayerController(Box):
         # Misc
         self.stopped = False
         self.player_queue = None
+        self.cue_timestamps = None
         self.current_track = 0
+        self.play_mode = 1
 
     def get_current_track(self):
         if self.player_queue is None:
             return None
         return self.player_queue[self.current_track]
+    
+    def get_current_timestamp(self):
+        if self.cue_timestamps is None:
+            return None
+        return self.cue_timestamps[self.current_track]
 
 
 class MainBoxDisplayPlaying(Box):
@@ -114,6 +132,28 @@ def ch_progress(obj):
     except ZeroDivisionError:
         return
 
+def ch_track_cue(obj):
+    """
+    Changes track if it's a cue file
+    """
+    if player_controls.play_mode != PLAY_MODES["CUE"]:
+        return
+    position = playback.position_get()
+    next_track, index = which_is_close(player_controls.cue_timestamps, position)
+    if next_track:
+        player_controls.current_track = index
+        main.title.text_set(player_controls.get_current_track())
+
+
+def which_is_close(arr, el):
+    """
+    returns an element and its index if it's close and smaller to the given element
+    """
+    for a in arr:
+        if isclose(a, el, rel_tol=0.005) and el > a:
+            return [a, arr.index(a)]
+    return [False, 0]
+
 def playing_icon(ic):
     """
     Switches between play and pause icons
@@ -126,9 +166,12 @@ def ch_playpause(obj, title, album, artist):
     If the player was stopped, set the audio metadata
     """
     if player_controls.stopped:
-        playback.file_set(str(player_controls.get_current_track()))
-        meta = player_utils.get_metadata(playback.file_get())
-        set_metadata(title, album, artist, meta)
+        if player_controls.play_mode == PLAY_MODES["CUE"]:
+            pass # we don't need to do anything here, the callback handles that
+        else:
+            playback.file_set(str(player_controls.get_current_track()))
+            meta = player_utils.get_metadata(playback.file_get())
+            set_metadata(title, album, artist, meta)
         player_controls.stopped = False
     obj.content_get().standard_set(playing_icon(obj.content_get().standard_get()))
     playback.play_set(not playback.play_get())
@@ -183,6 +226,7 @@ def set_dir(obj, event_info):
     """
     Sets the current directory and populate the play queue with it
     """
+    player_controls.play_mode = PLAY_MODES["DIR"]
     files = player_utils.filter_files(player_utils.get_all_files(event_info))
     if len(files) == 0: # no audio file in directory
         return
@@ -197,10 +241,34 @@ def set_dir(obj, event_info):
     playback.play_set(False)
     set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(queue_start))
 
+def set_cue(obj, event_info):
+    if not event_info.endswith(".cue"):
+        return
+    dirname = path.dirname(event_info)
+    player_controls.play_mode = PLAY_MODES["CUE"]
+    cue_info = cue.parse_cue(event_info)
+    playback.file_set(path.join(dirname, cue_info["file"]))
+    player_controls.player_queue = cue_info["tracklist"]
+    player_controls.cue_timestamps = cue_info["timestamps"]
+    main.title.text_set(player_controls.player_queue[0])
+    main.album.text_set(cue_info["album"])
+    main.artist.text_set(cue_info["artist"])
+
 def play_next(obj):
     """
     play the next track in the queue, stop the player if none after
     """
+    if player_controls.play_mode == PLAY_MODES["CUE"]:
+        try:
+            player_controls.current_track += 1
+            new_track = player_controls.get_current_track()
+            playback.position_set(player_controls.get_current_timestamp())
+            player_controls.play.content_get().standard_set("media_player/pause")
+            playback.play_set(True)
+            main.title.text_set(new_track)
+        except IndexError:
+            stop_player(obj)
+        return
     try:
         player_controls.current_track += 1
         new_track = player_controls.get_current_track()
@@ -217,6 +285,15 @@ def play_prev(obj):
     or go back to the beginning of the current track if 
     no track before or at more than 30% of the track
     """
+    if player_controls.play_mode == PLAY_MODES["CUE"]:
+        player_controls.current_track -= 1
+        prev_track = player_controls.get_current_track()
+        prev_timestamp = player_controls.get_current_timestamp()
+        playback.position_set(prev_timestamp)
+        player_controls.play.content_get().standard_set("media_player/pause")
+        playback.play_set(True)
+        main.title.text_set(prev_track)
+        return
     if time_bar.value_get() > 0.3:
         time_bar.value_set(0)
         playback.position_set(0)
@@ -253,15 +330,20 @@ def init_gui():
     playing = HeaderButton(header, text="Playing", content=ic_playing)
     fs = DirPicker(header)
     fs.callback_file_chosen_add(set_dir)
+    cue_fs = CuePicker(header)
+    cue_fs.callback_file_chosen_add(set_cue)
     header.pack_end(home)
     header.pack_end(playing)
     header.pack_end(fs)
+    header.pack_end(cue_fs)
 
     playing.show()
     ic_playing.show()
     home.show()
     ic_home.show()
     fs.show()
+    cue_fs.show()
+    #cue_fs.custom_filter_append(custom_filter_cue, filter_name="Cue Sheets") doesn't work for some reasons
     header.show()
 
     #### Main Box #####
@@ -279,6 +361,7 @@ def init_gui():
     player_controls.show()
     vbx.pack_end(player_controls)
     playback.on_position_update_add(ch_progress)
+    playback.on_position_update_add(ch_track_cue)
     #home.callback_clicked_add(ch_main_home, main_display, main)
     #playing.callback_clicked_add(ch_main_playing, main_display, main)
     win.show()

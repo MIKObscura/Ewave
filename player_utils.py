@@ -41,11 +41,3 @@ def filter_files(filelist):
     filter the files to keep audio files only
     """
     return list(filter(lambda f: f.name.split(".")[len(f.name.split(".")) - 1] in EXTENSIONS, filelist))
-
-def queue_gen(audio_files):
-    for f in audio_files:
-        try:
-            yield f
-        except ValueError:
-            print("Error")
-            continue
