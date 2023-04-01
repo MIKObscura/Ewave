@@ -79,7 +79,6 @@ class PlayerController(Box):
         # Misc
         self.stopped = False
         self.player_queue = None
-        self.cue_timestamps = None
         self.current_track = 0
         self.play_mode = 1
 
@@ -87,11 +86,6 @@ class PlayerController(Box):
         if self.player_queue is None:
             return None
         return self.player_queue[self.current_track]
-    
-    def get_current_timestamp(self):
-        if self.cue_timestamps is None:
-            return None
-        return self.cue_timestamps[self.current_track]
 
 
 class MainBoxDisplayPlaying(Box):
@@ -139,10 +133,11 @@ def ch_track_cue(obj):
     if player_controls.play_mode != PLAY_MODES["CUE"]:
         return
     position = playback.position_get()
-    next_track, index = which_is_close(player_controls.cue_timestamps, position)
+    next_track, index = which_is_close(player_controls.player_queue, position)
     if next_track:
         player_controls.current_track = index
-        main.title.text_set(player_controls.get_current_track())
+        main.title.text_set(player_controls.get_current_track().title)
+        main.artist.text_set(format_artists(player_controls.get_current_track().artists))
 
 
 def which_is_close(arr, el):
@@ -150,7 +145,7 @@ def which_is_close(arr, el):
     returns an element and its index if it's close and smaller to the given element
     """
     for a in arr:
-        if isclose(a, el, rel_tol=0.005) and el > a:
+        if isclose(a.timestamp, el, rel_tol=0.001) and el > a.timestamp:
             return [a, arr.index(a)]
     return [False, 0]
 
@@ -213,7 +208,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
         album_zone.text_set(meta['tags'].album[0])
     except AttributeError:
         album_zone.text_set(meta['tags'].title[0])
-    artist_zone.text_set(meta['tags'].artist[0])
+    artist_zone.text_set(" & ".join(meta['tags'].artist))
 
 def ch_volume(obj):
     """
@@ -249,10 +244,12 @@ def set_cue(obj, event_info):
     cue_info = cue.parse_cue(event_info)
     playback.file_set(path.join(dirname, cue_info["file"]))
     player_controls.player_queue = cue_info["tracklist"]
-    player_controls.cue_timestamps = cue_info["timestamps"]
-    main.title.text_set(player_controls.player_queue[0])
+    main.title.text_set(player_controls.get_current_track().title)
     main.album.text_set(cue_info["album"])
     main.artist.text_set(cue_info["artist"])
+
+def format_artists(artist_list):
+    return " & ".join(artist_list)
 
 def play_next(obj):
     """
@@ -261,23 +258,26 @@ def play_next(obj):
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         try:
             player_controls.current_track += 1
-            new_track = player_controls.get_current_track()
-            playback.position_set(player_controls.get_current_timestamp())
+            new_track = player_controls.get_current_track().title
+            new_time = player_controls.get_current_track().timestamp
+            new_artist = player_controls.get_current_track().artists
+            playback.position_set(new_time)
             player_controls.play.content_get().standard_set("media_player/pause")
             playback.play_set(True)
             main.title.text_set(new_track)
+            main.artist.text_set(format_artists(new_artist))
         except IndexError:
             stop_player(obj)
-        return
-    try:
-        player_controls.current_track += 1
-        new_track = player_controls.get_current_track()
-        playback.file_set(str(new_track))
-        set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(new_track))
-        player_controls.play.content_get().standard_set("media_player/pause")
-        playback.play_set(True)
-    except IndexError:
-        stop_player(obj)
+    else:
+        try:
+            player_controls.current_track += 1
+            new_track = player_controls.get_current_track()
+            playback.file_set(str(new_track))
+            set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(new_track))
+            player_controls.play.content_get().standard_set("media_player/pause")
+            playback.play_set(True)
+        except IndexError:
+            stop_player(obj)
 
 def play_prev(obj):
     """
@@ -287,28 +287,30 @@ def play_prev(obj):
     """
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         player_controls.current_track -= 1
-        prev_track = player_controls.get_current_track()
-        prev_timestamp = player_controls.get_current_timestamp()
+        prev_track = player_controls.get_current_track().title
+        prev_timestamp = player_controls.get_current_track().timestamp
+        prev_artist = player_controls.get_current_track().artists
         playback.position_set(prev_timestamp)
         player_controls.play.content_get().standard_set("media_player/pause")
         playback.play_set(True)
         main.title.text_set(prev_track)
-        return
-    if time_bar.value_get() > 0.3:
-        time_bar.value_set(0)
-        playback.position_set(0)
-        return
-    player_controls.current_track -= 1
-    prev_track = None
-    player_controls.play.content_get().standard_set("media_player/pause")
-    playback.play_set(True)
-    try:
-        prev_track = player_controls.get_current_track()
-        playback.file_set(str(prev_track))
-        set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(prev_track))
-    except IndexError:
-        time_bar.value_set(0)
-        playback.position_set(0)
+        main.artist.text_set(format_artists(prev_artist))
+    else:
+        if time_bar.value_get() > 0.3:
+            time_bar.value_set(0)
+            playback.position_set(0)
+            return
+        player_controls.current_track -= 1
+        prev_track = None
+        player_controls.play.content_get().standard_set("media_player/pause")
+        playback.play_set(True)
+        try:
+            prev_track = player_controls.get_current_track()
+            playback.file_set(str(prev_track))
+            set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(prev_track))
+        except IndexError:
+            time_bar.value_set(0)
+            playback.position_set(0)
 
 """
 Initialize everything

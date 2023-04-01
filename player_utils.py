@@ -5,12 +5,8 @@ from time import time_ns
 
 EXTENSIONS = ["mp3", "flac", "ogg"] # will be expanded in the future
 
-# basically C/C++ structs but in Python, currently unused but may be useful in teh future
-@dataclass
-class Track:
-    title: str
-    filename: str
-
+"""
+# basically C/C++ structs but in Python, currently unused but may be useful in the future
 @dataclass
 class Album:
     name: str
@@ -20,6 +16,7 @@ class Album:
 class Artist:
     name: str
     albums: list[Album] = field(default_factory=list)
+"""
 
 def get_metadata(path):
     try:
