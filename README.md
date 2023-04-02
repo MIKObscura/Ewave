@@ -1,7 +1,11 @@
 # Ewave
 This is an EFL based music player I decided to make to learn how to use this library because I think it looks good.  
 For now it's still in early development so it only has the basics of a music player.  
-To use it, launch `main.py` with your python interpreter, then click the select folder button and pick a directory that contains audio files, all the audio files in that directory will be put inside a play queue which will be used to control what's playing.
+To use it, launch `main.py` with your python interpreter, then click on one of the buttons in the top right to pick an option to populate the play queue, there are 4 at the moment:
+- Pick directory: select a directory that contains audio files, all the audio files in that directory will be put in the play queue
+- Pick playlist: select a text file that defines a playlist, these files should contain absolute paths to audio files, one per line
+- Pick cue: select a cue sheet, the file associated with that sheet will be the play queue
+- Add to queue: select a file and add it to the play queue [Note: doesn't work if you picked a cue before]
 
 # Requirements
 A few things are needed in order for the program to run, the python packages are in requirements.txt but there are other dependencies:

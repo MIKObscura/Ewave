@@ -37,6 +37,14 @@ class CuePicker(Fileselector, FileselectorButton):
     def __init__(self, parent) -> None:
         FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select cue")
 
+class PlaylistPicker(Fileselector, FileselectorButton):
+    def __init__(self, parent) -> None:
+        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select playlist")
+
+class FilesPicker(Fileselector, FileselectorButton):
+    def __init__(self, parent) -> None:
+        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Add file to queue")
+
 class PlayerController(Box):
     def __init__(self, parent) -> None:
         super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
@@ -78,7 +86,7 @@ class PlayerController(Box):
 
         # Misc
         self.stopped = False
-        self.player_queue = None
+        self.player_queue = []
         self.current_track = 0
         self.play_mode = 1
 
@@ -248,6 +256,21 @@ def set_cue(obj, event_info):
     main.album.text_set(cue_info["album"])
     main.artist.text_set(cue_info["artist"])
 
+def add_to_queue(obj, event_info):
+    if player_controls.play_mode == PLAY_MODES["CUE"]:
+        return
+    else:
+        player_controls.player_queue.append(event_info)
+        if playback.file_get() is None:
+            playback.file_set(player_controls.get_current_track())
+            set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
+
+def set_playlist(obj, event_info):
+    player_controls.play_mode = PLAY_MODES["PLAYLIST"]
+    pl = player_utils.parse_playlist(event_info)
+    player_controls.player_queue = pl
+    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
+
 def format_artists(artist_list):
     return " & ".join(artist_list)
 
@@ -326,25 +349,34 @@ def init_gui():
     vbx.show()
     #### Header Box #####
     header = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, horizontal=True, align=(0,1), size_hint_align=evas.FILL_BOTH)
-    ic_home = Icon(header, standard="user-home")
-    home = HeaderButton(header, text="Home", content=ic_home)
-    ic_playing = Icon(header, standard="media_player/play")
-    playing = HeaderButton(header, text="Playing", content=ic_playing)
+    #ic_home = Icon(header, standard="user-home") these buttons don't serve any purpose so I'll comment them out until 
+    # I find a use for them
+    #home = HeaderButton(header, text="Home", content=ic_home)
+    #ic_playing = Icon(header, standard="media_player/play")
+    #playing = HeaderButton(header, text="Playing", content=ic_playing)
     fs = DirPicker(header)
     fs.callback_file_chosen_add(set_dir)
     cue_fs = CuePicker(header)
     cue_fs.callback_file_chosen_add(set_cue)
-    header.pack_end(home)
-    header.pack_end(playing)
+    playlist_fs = PlaylistPicker(header)
+    playlist_fs.callback_file_chosen_add(set_playlist)
+    queue_add = FilesPicker(header)
+    queue_add.callback_file_chosen_add(add_to_queue)
+    #header.pack_end(home)
+    #header.pack_end(playing)
     header.pack_end(fs)
     header.pack_end(cue_fs)
+    header.pack_end(playlist_fs)
+    header.pack_end(queue_add)
 
-    playing.show()
-    ic_playing.show()
-    home.show()
-    ic_home.show()
+    #playing.show()
+    #ic_playing.show()
+    #home.show()
+    #ic_home.show()
     fs.show()
     cue_fs.show()
+    queue_add.show()
+    playlist_fs.show()
     #cue_fs.custom_filter_append(custom_filter_cue, filter_name="Cue Sheets") doesn't work for some reasons
     header.show()
 
@@ -364,6 +396,7 @@ def init_gui():
     vbx.pack_end(player_controls)
     playback.on_position_update_add(ch_progress)
     playback.on_position_update_add(ch_track_cue)
+    playback.on_playback_finished_add(play_next)
     #home.callback_clicked_add(ch_main_home, main_display, main)
     #playing.callback_clicked_add(ch_main_playing, main_display, main)
     win.show()

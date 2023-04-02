@@ -38,3 +38,15 @@ def filter_files(filelist):
     filter the files to keep audio files only
     """
     return list(filter(lambda f: f.name.split(".")[len(f.name.split(".")) - 1] in EXTENSIONS, filelist))
+
+def parse_playlist(file):
+    pl = []
+    try:
+        with open(file, "r") as playlist:
+            for track in playlist:
+                pl.append(track.strip())
+        return pl
+    except FileNotFoundError:
+        return []
+    except IOError:
+        return []
