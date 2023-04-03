@@ -8,6 +8,8 @@ from os import urandom, path
 from math import isclose
 import player_utils
 import cue
+from random import sample
+from pathlib import Path
 
 PLACEHOLDER_IMG = path.abspath("img/202377.png")
 PLAY_MODES = {
@@ -52,29 +54,41 @@ class PlayerController(Box):
         # Elements
         # Previous
         ic_prev = Icon(self, standard="media_player/prev")
-        self.prev = Button(self, content=ic_prev, scale=1.8)
+        self.prev = Button(self, content=ic_prev, scale=2)
         self.prev.callback_pressed_add(play_prev)
         self.pack_end(self.prev)
 
         # Play/Pause
         ic_play = Icon(self, standard="media_player/play")
-        self.play = Button(self, content=ic_play, scale=1.8)
+        self.play = Button(self, content=ic_play, scale=2)
         self.pack_end(self.play)
 
         # Next
         ic_next = Icon(self, standard="media_player/next")
-        self.b_next = Button(self, content=ic_next, scale=1.8)
+        self.b_next = Button(self, content=ic_next, scale=2)
         self.b_next.callback_pressed_add(play_next)
         self.pack_end(self.b_next)
 
         # Stop
         ic_stop = Icon(self, standard="media_player/stop")
-        self.stop = Button(self, content=ic_stop, scale=1.8)
+        self.stop = Button(self, content=ic_stop, scale=2)
         self.stop.callback_pressed_add(stop_player)
         self.pack_end(self.stop)
 
+        # Repeat
+        ic_repeat = Icon(self, standard="media-playlist-repeat")
+        self.repeat = Button(self, content=ic_repeat, scale=2)
+        self.repeat.callback_pressed_add(toggle_repeat)
+        self.pack_end(self.repeat)
+
+        # Shuffle
+        ic_shuffle = Icon(self, standard="media-playlist-shuffle")
+        self.shuffle = Button(self, content=ic_shuffle, scale=2)
+        self.shuffle.callback_pressed_add(toggle_shuffle)
+        self.pack_end(self.shuffle)
+
         # Volume Slider
-        self.volume = Slider(self, horizontal=True, span_size=100, value=1.0)
+        self.volume = Slider(self, horizontal=True, span_size=150, value=1.0)
         self.volume.callback_changed_add(ch_volume)
         self.pack_end(self.volume)
 
@@ -82,13 +96,19 @@ class PlayerController(Box):
         self.play.show()
         self.b_next.show()
         self.stop.show()
+        self.repeat.show()
+        self.shuffle.show()
         self.volume.show()
 
         # Misc
         self.stopped = False
         self.player_queue = []
+        self.unshuffled_queue = [] # used for going back to the normal queue when toggling shuffle
         self.current_track = 0
+        self.pos_save = 0 # memorize the position we were at before going into shuffle mode
         self.play_mode = 1
+        self.repeat_mode = False
+        self.shuffle_mode = False
 
     def get_current_track(self):
         if self.player_queue is None:
@@ -143,6 +163,9 @@ def ch_track_cue(obj):
     position = playback.position_get()
     next_track, index = which_is_close(player_controls.player_queue, position)
     if next_track:
+        if player_controls.repeat_mode:
+            playback.position_set(player_controls.get_current_track().timestamp)
+            return
         player_controls.current_track = index
         main.title.text_set(player_controls.get_current_track().title)
         main.artist.text_set(format_artists(player_controls.get_current_track().artists))
@@ -150,7 +173,7 @@ def ch_track_cue(obj):
 
 def which_is_close(arr, el):
     """
-    returns an element and its index if it's close and smaller to the given element
+    returns an element and its index if it's close to the given element and bigger, returns False and 0 if not
     """
     for a in arr:
         if isclose(a.timestamp, el, rel_tol=0.001) and el > a.timestamp:
@@ -239,10 +262,10 @@ def set_dir(obj, event_info):
         player_controls.player_queue = files
     except ValueError:
         player_controls.player_queue = files
-    queue_start = player_controls.player_queue[player_controls.current_track]
-    playback.file_set(str(queue_start))
+    player_controls.current_track = 0
+    playback.file_set(str(player_controls.get_current_track()))
     playback.play_set(False)
-    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(queue_start))
+    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
 
 def set_cue(obj, event_info):
     if not event_info.endswith(".cue"):
@@ -252,6 +275,7 @@ def set_cue(obj, event_info):
     cue_info = cue.parse_cue(event_info)
     playback.file_set(path.join(dirname, cue_info["file"]))
     player_controls.player_queue = cue_info["tracklist"]
+    player_controls.current_track = 0
     main.title.text_set(player_controls.get_current_track().title)
     main.album.text_set(cue_info["album"])
     main.artist.text_set(cue_info["artist"])
@@ -262,13 +286,15 @@ def add_to_queue(obj, event_info):
     else:
         player_controls.player_queue.append(event_info)
         if playback.file_get() is None:
-            playback.file_set(player_controls.get_current_track())
+            playback.file_set(str(player_controls.get_current_track()))
             set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
 
 def set_playlist(obj, event_info):
     player_controls.play_mode = PLAY_MODES["PLAYLIST"]
     pl = player_utils.parse_playlist(event_info)
     player_controls.player_queue = pl
+    player_controls.current_track = 0
+    playback.file_set(str(player_controls.get_current_track()))
     set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
 
 def format_artists(artist_list):
@@ -292,6 +318,9 @@ def play_next(obj):
         except IndexError:
             stop_player(obj)
     else:
+        if player_controls.repeat_mode and isinstance(obj, Emotion):
+            playback.position_set(0)
+            return
         try:
             player_controls.current_track += 1
             new_track = player_controls.get_current_track()
@@ -335,13 +364,38 @@ def play_prev(obj):
             time_bar.value_set(0)
             playback.position_set(0)
 
+def toggle_repeat(obj):
+    player_controls.repeat_mode = not player_controls.repeat_mode
+    if player_controls.repeat_mode:
+        player_controls.repeat.content_get().show()
+    else:
+        player_controls.repeat.content_get().hide()
+
+def toggle_shuffle(obj):
+    if player_controls.play_mode == PLAY_MODES["CUE"]: # no idea how to implement that yet
+        return
+    player_controls.shuffle_mode = not player_controls.shuffle_mode
+    if player_controls.shuffle_mode:
+        current_track = player_controls.get_current_track()
+        player_controls.unshuffled_queue = player_controls.player_queue
+        player_controls.player_queue = sample(player_controls.player_queue, len(player_controls.player_queue))
+        if player_controls.player_queue[0] != current_track: # make sure the current track is the first in the shuffled list
+            index = player_controls.player_queue.index(current_track)
+            old_first = player_controls.player_queue[0]
+            player_controls.player_queue[0] = current_track
+            player_controls.player_queue[index] = old_first
+        player_controls.current_track = 0
+    else:
+        player_controls.player_queue = player_controls.unshuffled_queue
+        player_controls.current_track = player_controls.player_queue.index(Path(playback.file_get()))
+
 """
 Initialize everything
 """
 def init_gui():
     global win, vbx, header, main, time_bar, playback, player_controls
     win = MainWindow()
-    playback = Emotion(win.evas, module_name="vlc")
+    playback = Emotion(win.evas, module_name="vlc", audio_volume=1)
     #playback.on_open_done_add(load_test)
 
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
@@ -384,16 +438,20 @@ def init_gui():
     main = MainBoxDisplayPlaying(vbx)
     vbx.pack_start(main)
 
+    bottom = Box(vbx, size_hint_weight=evas.EXPAND_HORIZ, size_hint_align=evas.FILL_HORIZ, padding=(0, 30))
+    bottom.show()
+
     #### Progress Bar ####
     time_bar = Progressbar(vbx, horizontal=True, value=0, size_hint_align=evas.FILL_HORIZ, size_hint_weight=evas.EXPAND_BOTH)
     time_bar.show()
-    vbx.pack_end(time_bar)
+    bottom.pack_end(time_bar)
 
     #### Player Buttons ####
     player_controls = PlayerController(vbx)
     player_controls.play.callback_pressed_add(ch_playpause, main.title, main.album, main.artist)
     player_controls.show()
-    vbx.pack_end(player_controls)
+    bottom.pack_end(player_controls)
+    vbx.pack_end(bottom)
     playback.on_position_update_add(ch_progress)
     playback.on_position_update_add(ch_track_cue)
     playback.on_playback_finished_add(play_next)
