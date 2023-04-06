@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from time import time_ns
 
-EXTENSIONS = ["mp3", "flac", "ogg"] # will be expanded in the future
+EXTENSIONS = ["mp3", "flac", "ogg", "wav"] # will be expanded in the future
 
 """
 # basically C/C++ structs but in Python, currently unused but may be useful in the future

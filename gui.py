@@ -18,34 +18,27 @@ PLAY_MODES = {
     "PLAYLIST": 3
 }
 
+
 class MainWindow(StandardWindow):
     def __init__(self) -> None:
         super().__init__("main", "Ewave", autodel=True, borderless=False, size=(1200,800))
         self.callback_delete_request_add(lambda o: elm_exit())
 
+
 class HeaderButton(Button):
     def __init__(self, parent, content, text) -> None:
         super().__init__(parent, content=content, text=text, style="anchor", scale=1.2, autorepeat=False)
+
 
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
         super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_WORD)
 
-class DirPicker(Fileselector, FileselectorButton):
-    def __init__(self, parent) -> None:
-        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select folder", folder_only=True)
 
-class CuePicker(Fileselector, FileselectorButton):
-    def __init__(self, parent) -> None:
-        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select cue")
+class FSButton(Fileselector, FileselectorButton):
+    def __init__(self, *args, **kwargs) -> None:
+        FileselectorButton.__init__(self, *args, **kwargs)
 
-class PlaylistPicker(Fileselector, FileselectorButton):
-    def __init__(self, parent) -> None:
-        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Select playlist")
-
-class FilesPicker(Fileselector, FileselectorButton):
-    def __init__(self, parent) -> None:
-        FileselectorButton.__init__(self, parent=parent, style="anchor", text="Add file to queue")
 
 class PlayerController(Box):
     def __init__(self, parent) -> None:
@@ -111,7 +104,7 @@ class PlayerController(Box):
         self.shuffle_mode = False
 
     def get_current_track(self):
-        if self.player_queue is None:
+        if not len(self.player_queue):
             return None
         return self.player_queue[self.current_track]
 
@@ -139,6 +132,7 @@ class MainBoxDisplayPlaying(Box):
         self.pack_end(self.playing)
         self.pack_start(self.cover)
 
+
 """
 Functions used for callbacks
 """
@@ -153,6 +147,7 @@ def ch_progress(obj):
         time_bar.value_set(percent)
     except ZeroDivisionError:
         return
+
 
 def ch_track_cue(obj):
     """
@@ -180,11 +175,13 @@ def which_is_close(arr, el):
             return [a, arr.index(a)]
     return [False, 0]
 
+
 def playing_icon(ic):
     """
     Switches between play and pause icons
     """
     return "media_player/play" if ic == "media_player/pause" else "media_player/pause"
+
 
 def ch_playpause(obj, title, album, artist):
     """
@@ -202,6 +199,7 @@ def ch_playpause(obj, title, album, artist):
     obj.content_get().standard_set(playing_icon(obj.content_get().standard_get()))
     playback.play_set(not playback.play_get())
 
+
 def stop_player(obj):
     """
     Stops the player and removes the audio metadata display
@@ -218,6 +216,7 @@ def stop_player(obj):
     playback.play_set(False)
     playback.file_set(None)
     player_controls.current_track = 0
+
 
 def set_metadata(title_zone, album_zone, artist_zone, meta):
     """
@@ -241,12 +240,14 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
         album_zone.text_set(meta['tags'].title[0])
     artist_zone.text_set(" & ".join(meta['tags'].artist))
 
+
 def ch_volume(obj):
     """
     Change the volume
     """
     new_vol = obj.value_get()
     playback.audio_volume_set(new_vol)
+
 
 def set_dir(obj, event_info):
     """
@@ -267,6 +268,7 @@ def set_dir(obj, event_info):
     playback.play_set(False)
     set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
 
+
 def set_cue(obj, event_info):
     if not event_info.endswith(".cue"):
         return
@@ -280,14 +282,18 @@ def set_cue(obj, event_info):
     main.album.text_set(cue_info["album"])
     main.artist.text_set(cue_info["artist"])
 
-def add_to_queue(obj, event_info):
+
+def add_to_queue(obj, event_info, selections):
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         return
     else:
+        if Path(event_info).suffix.replace('.', '') not in player_utils.EXTENSIONS:
+            return
         player_controls.player_queue.append(event_info)
         if playback.file_get() is None:
             playback.file_set(str(player_controls.get_current_track()))
             set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
+
 
 def set_playlist(obj, event_info):
     player_controls.play_mode = PLAY_MODES["PLAYLIST"]
@@ -297,8 +303,10 @@ def set_playlist(obj, event_info):
     playback.file_set(str(player_controls.get_current_track()))
     set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()))
 
+
 def format_artists(artist_list):
     return " & ".join(artist_list)
+
 
 def play_next(obj):
     """
@@ -330,6 +338,7 @@ def play_next(obj):
             playback.play_set(True)
         except IndexError:
             stop_player(obj)
+
 
 def play_prev(obj):
     """
@@ -364,14 +373,18 @@ def play_prev(obj):
             time_bar.value_set(0)
             playback.position_set(0)
 
+
 def toggle_repeat(obj):
+    player_controls.repeat.style_set("anchor" if player_controls.repeat.style_get() == "default" else "default")
     player_controls.repeat_mode = not player_controls.repeat_mode
     if player_controls.repeat_mode:
         player_controls.repeat.content_get().show()
     else:
         player_controls.repeat.content_get().hide()
 
+
 def toggle_shuffle(obj):
+    player_controls.shuffle.style_set("anchor" if player_controls.shuffle.style_get() == "default" else "default")
     if player_controls.play_mode == PLAY_MODES["CUE"]: # no idea how to implement that yet
         return
     player_controls.shuffle_mode = not player_controls.shuffle_mode
@@ -379,15 +392,28 @@ def toggle_shuffle(obj):
         current_track = player_controls.get_current_track()
         player_controls.unshuffled_queue = player_controls.player_queue
         player_controls.player_queue = sample(player_controls.player_queue, len(player_controls.player_queue))
-        if player_controls.player_queue[0] != current_track: # make sure the current track is the first in the shuffled list
-            index = player_controls.player_queue.index(current_track)
-            old_first = player_controls.player_queue[0]
-            player_controls.player_queue[0] = current_track
-            player_controls.player_queue[index] = old_first
+        try:
+            if player_controls.player_queue[0] != current_track: # make sure the current track is the first in the shuffled list
+                index = player_controls.player_queue.index(current_track)
+                old_first = player_controls.player_queue[0]
+                player_controls.player_queue[0] = current_track
+                player_controls.player_queue[index] = old_first
+        except IndexError:
+            return
         player_controls.current_track = 0
     else:
         player_controls.player_queue = player_controls.unshuffled_queue
-        player_controls.current_track = player_controls.player_queue.index(Path(playback.file_get()))
+        try:
+            player_controls.current_track = player_controls.player_queue.index(Path(playback.file_get()))
+        except ValueError:
+            player_controls.current_track = player_controls.player_queue.index(playback.file_get())
+        except TypeError: # happens when the list is empty
+            return
+
+
+def custom_filter_cue(is_dir, path, data):
+    return not is_dir and path.endswith(".cue")
+
 
 """
 Initialize everything
@@ -408,14 +434,17 @@ def init_gui():
     #home = HeaderButton(header, text="Home", content=ic_home)
     #ic_playing = Icon(header, standard="media_player/play")
     #playing = HeaderButton(header, text="Playing", content=ic_playing)
-    fs = DirPicker(header)
+    fs = FSButton(parent=header, style="anchor", text="Select folder", folder_only=True)
     fs.callback_file_chosen_add(set_dir)
-    cue_fs = CuePicker(header)
+    cue_fs = FSButton(parent=header, style="anchor", text="Select cue")
+    #cue_fs.custom_filter_append(custom_filter_cue, filter_name="Cue Files")
     cue_fs.callback_file_chosen_add(set_cue)
-    playlist_fs = PlaylistPicker(header)
+    playlist_fs = FSButton(parent=header, style="anchor", text="Select playlist")
+    #playlist_fs.mime_types_filter_append(["text/plain"], "Text Files")
     playlist_fs.callback_file_chosen_add(set_playlist)
-    queue_add = FilesPicker(header)
-    queue_add.callback_file_chosen_add(add_to_queue)
+    queue_add = FSButton(parent=header, style="anchor", text="Add file to queue", multi_select=True) # multi_select doesn't seem to work
+    #queue_add.mime_types_filter_append(["audio/ogg", "audio/mpeg", "audio/flac"], "Audio Files")
+    queue_add.callback_file_chosen_add(add_to_queue, queue_add.selected_paths)
     #header.pack_end(home)
     #header.pack_end(playing)
     header.pack_end(fs)
