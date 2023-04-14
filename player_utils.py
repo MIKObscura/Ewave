@@ -1,7 +1,6 @@
 import audio_metadata
 from dataclasses import dataclass, field
 from pathlib import Path
-from time import time_ns
 
 EXTENSIONS = ["mp3", "flac", "ogg", "wav"] # will be expanded in the future
 

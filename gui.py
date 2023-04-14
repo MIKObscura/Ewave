@@ -1,5 +1,5 @@
-from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton
-from efl.elementary import ELM_WRAP_WORD
+from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton, Genlist, GenlistItemClass
+from efl.elementary import ELM_WRAP_WORD, ELM_GENLIST_ITEM_NONE
 from efl.elementary import exit as elm_exit
 from efl.emotion import Emotion
 import efl.evas as evas
@@ -15,7 +15,7 @@ PLACEHOLDER_IMG = path.abspath("img/202377.png")
 PLAY_MODES = {
     "DIR": 1,
     "CUE": 2,
-    "PLAYLIST": 3
+    "PLAYLIST": 3 # changes nothing for now but was added in case
 }
 
 
@@ -222,7 +222,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
     """
     Puts the audio metadata in the window
     """
-    # this is very ugly and dumb but for some reasons efl's Image with memfile_set wouldn't work so it's the only way I found 
+    # this is very ugly and dumb but for some reasons efl's Image widget with memfile_set wouldn't work so it's the only way I found 
     # to display the image from the audio metadata
     tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
     try:
@@ -238,7 +238,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta):
         album_zone.text_set(meta['tags'].album[0])
     except AttributeError:
         album_zone.text_set(meta['tags'].title[0])
-    artist_zone.text_set(" & ".join(meta['tags'].artist))
+    artist_zone.text_set(format_artists(meta['tags'].artist))
 
 
 def ch_volume(obj):
@@ -375,6 +375,10 @@ def play_prev(obj):
 
 
 def toggle_repeat(obj):
+    """
+    Toggles the repeat state
+    In repeat state, the currently playing track will restart when finished
+    """
     player_controls.repeat.style_set("anchor" if player_controls.repeat.style_get() == "default" else "default")
     player_controls.repeat_mode = not player_controls.repeat_mode
     if player_controls.repeat_mode:
@@ -384,6 +388,12 @@ def toggle_repeat(obj):
 
 
 def toggle_shuffle(obj):
+    """
+    Toggles the shuffle state
+    When in shuffle state, the play queue is shuffled,
+    when disabling shuffle, the play queue is put back at
+    its original state
+    """
     player_controls.shuffle.style_set("anchor" if player_controls.shuffle.style_get() == "default" else "default")
     if player_controls.play_mode == PLAY_MODES["CUE"]: # no idea how to implement that yet
         return
@@ -410,6 +420,44 @@ def toggle_shuffle(obj):
         except TypeError: # happens when the list is empty
             return
 
+def glic_text_get(obj, part, item_data):
+    """
+    Used by GenlistItemClass to set the text of the item
+    """
+    track_data = player_utils.get_metadata(item_data)
+    if item_data == player_controls.get_current_track(): # indicate which is the current track
+        return F"<b>{format_artists(track_data['tags'].artist)} - {track_data['tags'].title[0]}</b>"
+    return F"{format_artists(track_data['tags'].artist)} - {track_data['tags'].title[0]}"
+
+def reorder_queue(obj, a):
+    """
+    Updates the order of the play queue after a 
+    track in the list has been moved
+    """
+    curr_track = player_controls.get_current_track()
+    new_list = []
+    for i in range(len(player_controls.player_queue)):
+        new_list.append(obj.nth_item_get(i).data_get())
+    player_controls.player_queue = new_list
+    curr_track_index = player_controls.player_queue.index(curr_track)
+    player_controls.current_track = curr_track_index # in case the currently playing track moved
+
+def sh_queue(obj):
+    """
+    Displays a window containing the play queue
+    """
+    if player_controls.play_mode == PLAY_MODES["CUE"]:
+        return
+    queue_view = StandardWindow("queue", "Player Queue", autodel=True, borderless=False, size=(500,500))
+    queue_list = Genlist(queue_view, reorder_mode=True)
+    list_item = GenlistItemClass(item_style="default_style", text_get_func=glic_text_get)
+    for t in player_controls.player_queue:
+        queue_list.item_append(list_item, t, flags=ELM_GENLIST_ITEM_NONE)
+    queue_list.callback_moved_add(reorder_queue)
+    queue_view.resize_object_add(queue_list)
+    queue_list.show()
+    queue_view.show()
+
 
 def custom_filter_cue(is_dir, path, data):
     return not is_dir and path.endswith(".cue")
@@ -419,21 +467,15 @@ def custom_filter_cue(is_dir, path, data):
 Initialize everything
 """
 def init_gui():
-    global win, vbx, header, main, time_bar, playback, player_controls
+    global win, vbx, header, main, time_bar, playback, player_controls, queue_view
     win = MainWindow()
     playback = Emotion(win.evas, module_name="vlc", audio_volume=1)
-    #playback.on_open_done_add(load_test)
 
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
     win.resize_object_add(vbx)
     vbx.show()
     #### Header Box #####
     header = Box(vbx, size_hint_weight=evas.EXPAND_BOTH, horizontal=True, align=(0,1), size_hint_align=evas.FILL_BOTH)
-    #ic_home = Icon(header, standard="user-home") these buttons don't serve any purpose so I'll comment them out until 
-    # I find a use for them
-    #home = HeaderButton(header, text="Home", content=ic_home)
-    #ic_playing = Icon(header, standard="media_player/play")
-    #playing = HeaderButton(header, text="Playing", content=ic_playing)
     fs = FSButton(parent=header, style="anchor", text="Select folder", folder_only=True)
     fs.callback_file_chosen_add(set_dir)
     cue_fs = FSButton(parent=header, style="anchor", text="Select cue")
@@ -445,21 +487,19 @@ def init_gui():
     queue_add = FSButton(parent=header, style="anchor", text="Add file to queue", multi_select=True) # multi_select doesn't seem to work
     #queue_add.mime_types_filter_append(["audio/ogg", "audio/mpeg", "audio/flac"], "Audio Files")
     queue_add.callback_file_chosen_add(add_to_queue, queue_add.selected_paths)
-    #header.pack_end(home)
-    #header.pack_end(playing)
+    queue_viewer = Button(header, text="View queue")
+    queue_viewer.callback_pressed_add(sh_queue)
     header.pack_end(fs)
     header.pack_end(cue_fs)
     header.pack_end(playlist_fs)
     header.pack_end(queue_add)
+    header.pack_end(queue_viewer)
 
-    #playing.show()
-    #ic_playing.show()
-    #home.show()
-    #ic_home.show()
     fs.show()
     cue_fs.show()
     queue_add.show()
     playlist_fs.show()
+    queue_viewer.show()
     #cue_fs.custom_filter_append(custom_filter_cue, filter_name="Cue Sheets") doesn't work for some reasons
     header.show()
 
@@ -484,6 +524,4 @@ def init_gui():
     playback.on_position_update_add(ch_progress)
     playback.on_position_update_add(ch_track_cue)
     playback.on_playback_finished_add(play_next)
-    #home.callback_clicked_add(ch_main_home, main_display, main)
-    #playing.callback_clicked_add(ch_main_playing, main_display, main)
     win.show()
