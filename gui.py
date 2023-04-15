@@ -422,12 +422,18 @@ def toggle_shuffle(obj):
 
 def glic_text_get(obj, part, item_data):
     """
-    Used by GenlistItemClass to set the text of the item
+    Used by GenlistItemClass to set the text of the items
     """
     track_data = player_utils.get_metadata(item_data)
-    if item_data == player_controls.get_current_track(): # indicate which is the current track
-        return F"<b>{format_artists(track_data['tags'].artist)} - {track_data['tags'].title[0]}</b>"
     return F"{format_artists(track_data['tags'].artist)} - {track_data['tags'].title[0]}"
+
+def glic_content_get(obj, part, item_data):
+    """
+    Used by GenlistItemClass to set the icon of the items
+    """
+    if item_data == player_controls.get_current_track(): # indicate which is the current track
+        return Icon(obj, standard="media_player/play")
+    return Icon(obj, standard="media-record")
 
 def reorder_queue(obj, a):
     """
@@ -450,7 +456,7 @@ def sh_queue(obj):
         return
     queue_view = StandardWindow("queue", "Player Queue", autodel=True, borderless=False, size=(500,500))
     queue_list = Genlist(queue_view, reorder_mode=True)
-    list_item = GenlistItemClass(item_style="default_style", text_get_func=glic_text_get)
+    list_item = GenlistItemClass(item_style="one_icon", text_get_func=glic_text_get, content_get_func=glic_content_get)
     for t in player_controls.player_queue:
         queue_list.item_append(list_item, t, flags=ELM_GENLIST_ITEM_NONE)
     queue_list.callback_moved_add(reorder_queue)
