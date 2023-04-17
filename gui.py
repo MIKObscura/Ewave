@@ -45,6 +45,11 @@ class PlayerController(Box):
         super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
 
         # Elements
+        # Seek backwards
+        ic_seek_back = Icon(self, standard="media_player/rewind")
+        self.seek_back = Button(self, content=ic_seek_back, scale=2)
+        self.seek_back.callback_pressed_add(seek_backward)
+        self.pack_end(self.seek_back)
         # Previous
         ic_prev = Icon(self, standard="media_player/prev")
         self.prev = Button(self, content=ic_prev, scale=2)
@@ -61,6 +66,12 @@ class PlayerController(Box):
         self.b_next = Button(self, content=ic_next, scale=2)
         self.b_next.callback_pressed_add(play_next)
         self.pack_end(self.b_next)
+
+        # Seek forward
+        ic_seek_for = Icon(self, standard="media_player/forward")
+        self.seek_for = Button(self, content=ic_seek_for, scale=2)
+        self.seek_for.callback_pressed_add(seek_forward)
+        self.pack_end(self.seek_for)
 
         # Stop
         ic_stop = Icon(self, standard="media_player/stop")
@@ -81,7 +92,8 @@ class PlayerController(Box):
         self.pack_end(self.shuffle)
 
         # Volume Slider
-        self.volume = Slider(self, horizontal=True, span_size=150, value=1.0)
+        ic_volume = Icon(self, standard="audio-volume")
+        self.volume = Slider(self, horizontal=True, span_size=150, value=1.0, content=ic_volume, scale=1.5)
         self.volume.callback_changed_add(ch_volume)
         self.pack_end(self.volume)
 
@@ -92,6 +104,8 @@ class PlayerController(Box):
         self.repeat.show()
         self.shuffle.show()
         self.volume.show()
+        self.seek_back.show()
+        self.seek_for.show()
 
         # Misc
         self.stopped = False
@@ -247,6 +261,10 @@ def ch_volume(obj):
     """
     new_vol = obj.value_get()
     playback.audio_volume_set(new_vol)
+    if new_vol == 0:
+        obj.content_get().standard_set("audio-volume-muted")
+    elif new_vol != 0 and obj.content_get().standard_get() == "audio-volume-muted":
+        obj.content_get().standard_set("audio-volume")
 
 
 def set_dir(obj, event_info):
@@ -419,6 +437,22 @@ def toggle_shuffle(obj):
             player_controls.current_track = player_controls.player_queue.index(playback.file_get())
         except TypeError: # happens when the list is empty
             return
+
+def seek_backward(obj):
+    curr_pos = playback.position_get()
+    curr_pos -= 10
+    if curr_pos < 0:
+        playback.position_set(0)
+    else:
+        playback.position_set(curr_pos)
+
+def seek_forward(obj):
+    curr_pos = playback.position_get()
+    curr_pos += 10
+    if curr_pos > playback.play_length_get():
+        playback.play_next(obj)
+    else:
+        playback.position_set(curr_pos)
 
 def glic_text_get(obj, part, item_data):
     """
