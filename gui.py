@@ -427,6 +427,9 @@ def glic_text_get(obj, part, item_data):
     track_data = player_utils.get_metadata(item_data)
     return F"{format_artists(track_data['tags'].artist)} - {track_data['tags'].title[0]}"
 
+def glic_text_get_cue(obj, part, item_data):
+    return F"{format_artists(item_data.artists)} - {item_data.title}"
+
 def glic_content_get(obj, part, item_data):
     """
     Used by GenlistItemClass to set the icon of the items
@@ -452,11 +455,13 @@ def sh_queue(obj):
     """
     Displays a window containing the play queue
     """
-    if player_controls.play_mode == PLAY_MODES["CUE"]:
-        return
+    list_item = None
     queue_view = StandardWindow("queue", "Player Queue", autodel=True, borderless=False, size=(500,500))
     queue_list = Genlist(queue_view, reorder_mode=True)
-    list_item = GenlistItemClass(item_style="one_icon", text_get_func=glic_text_get, content_get_func=glic_content_get)
+    if player_controls.play_mode == PLAY_MODES["CUE"]:
+        list_item = GenlistItemClass(item_style="one_icon", text_get_func=glic_text_get_cue, content_get_func=glic_content_get)
+    else:
+        list_item = GenlistItemClass(item_style="one_icon", text_get_func=glic_text_get, content_get_func=glic_content_get)
     for t in player_controls.player_queue:
         queue_list.item_append(list_item, t, flags=ELM_GENLIST_ITEM_NONE)
     queue_list.callback_moved_add(reorder_queue)
