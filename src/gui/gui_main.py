@@ -1,28 +1,16 @@
-from efl.elementary import Box, StandardWindow, Button, Icon, Table, Photo, Label, Progressbar, Slider, Fileselector, FileselectorButton, Genlist, GenlistItemClass
-from efl.elementary import ELM_WRAP_WORD, ELM_GENLIST_ITEM_NONE
-from efl.elementary import exit as elm_exit
+from efl.elementary import Box, StandardWindow, Button, Icon, Progressbar, Fileselector, FileselectorButton, Genlist, GenlistItemClass
+from efl.elementary import ELM_GENLIST_ITEM_NONE
 from efl.emotion import Emotion
 import efl.evas as evas
 from binascii import b2a_hex
 from os import urandom, path
 from math import isclose
-import player_utils
-import cue
 from random import sample
 from pathlib import Path
-
-PLACEHOLDER_IMG = path.abspath("img/202377.png")
-PLAY_MODES = {
-    "DIR": 1,
-    "CUE": 2,
-    "PLAYLIST": 3 # changes nothing for now but was added in case
-}
-
-
-class MainWindow(StandardWindow):
-    def __init__(self) -> None:
-        super().__init__("main", "Ewave", autodel=True, borderless=False, size=(1200,800))
-        self.callback_delete_request_add(lambda o: elm_exit())
+import utils.player_utils as player_utils
+import utils.cue as cue
+from gui.main_windows import MainBoxDisplayPlaying, MainWindow, PLACEHOLDER_IMG
+from gui.player_controls import PlayerController, PLAY_MODES
 
 
 class HeaderButton(Button):
@@ -30,121 +18,9 @@ class HeaderButton(Button):
         super().__init__(parent, content=content, text=text, style="anchor", scale=1.2, autorepeat=False)
 
 
-class MetaTextDisplay(Label):
-    def __init__(self, parent, text) -> None:
-        super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_WORD)
-
-
 class FSButton(Fileselector, FileselectorButton):
     def __init__(self, *args, **kwargs) -> None:
         FileselectorButton.__init__(self, *args, **kwargs)
-
-
-class PlayerController(Box):
-    def __init__(self, parent) -> None:
-        super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
-
-        # Elements
-        # Seek backwards
-        ic_seek_back = Icon(self, standard="media_player/rewind")
-        self.seek_back = Button(self, content=ic_seek_back, scale=2)
-        self.seek_back.callback_pressed_add(seek_backward)
-        self.pack_end(self.seek_back)
-        # Previous
-        ic_prev = Icon(self, standard="media_player/prev")
-        self.prev = Button(self, content=ic_prev, scale=2)
-        self.prev.callback_pressed_add(play_prev)
-        self.pack_end(self.prev)
-
-        # Play/Pause
-        ic_play = Icon(self, standard="media_player/play")
-        self.play = Button(self, content=ic_play, scale=2)
-        self.pack_end(self.play)
-
-        # Next
-        ic_next = Icon(self, standard="media_player/next")
-        self.b_next = Button(self, content=ic_next, scale=2)
-        self.b_next.callback_pressed_add(play_next)
-        self.pack_end(self.b_next)
-
-        # Seek forward
-        ic_seek_for = Icon(self, standard="media_player/forward")
-        self.seek_for = Button(self, content=ic_seek_for, scale=2)
-        self.seek_for.callback_pressed_add(seek_forward)
-        self.pack_end(self.seek_for)
-
-        # Stop
-        ic_stop = Icon(self, standard="media_player/stop")
-        self.stop = Button(self, content=ic_stop, scale=2)
-        self.stop.callback_pressed_add(stop_player)
-        self.pack_end(self.stop)
-
-        # Repeat
-        ic_repeat = Icon(self, standard="media-playlist-repeat")
-        self.repeat = Button(self, content=ic_repeat, scale=2)
-        self.repeat.callback_pressed_add(toggle_repeat)
-        self.pack_end(self.repeat)
-
-        # Shuffle
-        ic_shuffle = Icon(self, standard="media-playlist-shuffle")
-        self.shuffle = Button(self, content=ic_shuffle, scale=2)
-        self.shuffle.callback_pressed_add(toggle_shuffle)
-        self.pack_end(self.shuffle)
-
-        # Volume Slider
-        ic_volume = Icon(self, standard="audio-volume")
-        self.volume = Slider(self, horizontal=True, span_size=150, value=1.0, content=ic_volume, scale=1.5)
-        self.volume.callback_changed_add(ch_volume)
-        self.pack_end(self.volume)
-
-        self.prev.show()
-        self.play.show()
-        self.b_next.show()
-        self.stop.show()
-        self.repeat.show()
-        self.shuffle.show()
-        self.volume.show()
-        self.seek_back.show()
-        self.seek_for.show()
-
-        # Misc
-        self.stopped = False
-        self.player_queue = []
-        self.unshuffled_queue = [] # used for going back to the normal queue when toggling shuffle
-        self.current_track = 0
-        self.pos_save = 0 # memorize the position we were at before going into shuffle mode
-        self.play_mode = 1
-        self.repeat_mode = False
-        self.shuffle_mode = False
-
-    def get_current_track(self):
-        if not len(self.player_queue):
-            return None
-        return self.player_queue[self.current_track]
-
-
-class MainBoxDisplayPlaying(Box):
-    def __init__(self, parent) -> None:
-        super().__init__(parent, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_BOTH, horizontal=True)
-        self.playing = Table(self, size_hint_weight=evas.EXPAND_BOTH)
-        self.playing.show()
-        self.cover = Photo(self, size=500, size_hint_weight=evas.EXPAND_BOTH, editable=False, fill_inside=False, file=PLACEHOLDER_IMG)
-        self.title = MetaTextDisplay(self, text="Nothing Playing!")
-        self.album = MetaTextDisplay(self, text=" ")
-        self.artist = MetaTextDisplay(self, text=" ")
-
-        self.album.show()
-        self.title.show()
-        self.artist.show()
-        self.cover.show()
-
-        self.playing.pack(self.title, 0, 4, 1, 1)
-        self.playing.pack(self.album, 0, 5, 1, 1)
-        self.playing.pack(self.artist, 0, 6, 1, 1)
-
-        self.show()
-        self.pack_end(self.playing)
-        self.pack_start(self.cover)
 
 
 """
@@ -514,7 +390,7 @@ Initialize everything
 def init_gui():
     global win, vbx, header, main, time_bar, playback, player_controls, queue_view
     win = MainWindow()
-    playback = Emotion(win.evas, module_name="vlc", audio_volume=1)
+    playback = Emotion(win.evas, module_name="vlc")
 
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
     win.resize_object_add(vbx)
@@ -562,7 +438,17 @@ def init_gui():
 
     #### Player Buttons ####
     player_controls = PlayerController(vbx)
+    # add all the callbacks
+    player_controls.volume.callback_changed_add(ch_volume)
+    player_controls.shuffle.callback_pressed_add(toggle_shuffle)
+    player_controls.repeat.callback_pressed_add(toggle_repeat)
+    player_controls.stop.callback_pressed_add(stop_player)
+    player_controls.seek_for.callback_pressed_add(seek_forward)
+    player_controls.b_next.callback_pressed_add(play_next)
+    player_controls.prev.callback_pressed_add(play_prev)
+    player_controls.seek_back.callback_pressed_add(seek_backward)
     player_controls.play.callback_pressed_add(ch_playpause, main.title, main.album, main.artist)
+
     player_controls.show()
     bottom.pack_end(player_controls)
     vbx.pack_end(bottom)
