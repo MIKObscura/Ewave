@@ -97,7 +97,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta, cover):
     """
     Puts the audio metadata in the window
     """
-    # this is very ugly and dumb but for some reasons efl's Image widget with memfile_set wouldn't work so it's the only way I found 
+    # this is very ugly and dumb but for some reasons efl's Image widget with memfile_set wouldn't work so it's the only way I found
     # to display the image from the audio metadata
     tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
     try:
@@ -150,6 +150,7 @@ def set_dir(obj, event_info, player_controls, playback, main):
 
 def set_cue(obj, event_info, main, playback, player_controls):
     if not event_info.endswith(".cue"):
+        print("Error: not a cue sheet")
         return
     dirname = path.dirname(event_info)
     player_controls.play_mode = PLAY_MODES["CUE"]
@@ -222,7 +223,7 @@ def play_next(obj, player_controls, playback, main):
 def play_prev(obj, player_controls, playback, main, time_bar):
     """
     play the previous track,
-    or go back to the beginning of the current track if 
+    or go back to the beginning of the current track if
     no track before or at more than 30% of the track
     """
     if player_controls.play_mode == PLAY_MODES["CUE"]:
@@ -334,7 +335,7 @@ def glic_content_get_playing(obj, part, item_data):
 
 def reorder_queue(obj, a, player_controls):
     """
-    Updates the order of the play queue after a 
+    Updates the order of the play queue after a
     track in the list has been moved
     """
     curr_track = player_controls.get_current_track()
