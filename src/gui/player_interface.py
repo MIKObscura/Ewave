@@ -1,4 +1,4 @@
-import gui_callbacks
+import gui.gui_callbacks
 from utils.player_utils import get_metadata, time_string_to_us
 import datetime
 

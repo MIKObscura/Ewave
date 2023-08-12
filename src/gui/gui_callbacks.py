@@ -13,6 +13,10 @@ from gui.player_controls import PLAY_MODES
 def ch_progress(obj, playback, time_bar):
     """
     Updates the progressbar based on the position in the file
+    params:
+        obj: the widget that calls the function
+        playback efl.Emotion: efl.Emotion instance
+        time_bar efl.elementary.Progressbar: progress bar widget
     """
     duration = playback.play_length_get()
     position = playback.position_get()
@@ -26,6 +30,11 @@ def ch_progress(obj, playback, time_bar):
 def ch_track_cue(obj, player_controls, playback, main):
     """
     Changes track if it's a cue file
+    params:
+        obj: the widget that calls the function
+        player_controls PlayerControls: PlayerControl instance
+        playback efl.Emotion: efl.Emotion instance
+        main MainBoxDisplayPlaying: main container of the window
     """
     if player_controls.play_mode != PLAY_MODES["CUE"]:
         return
@@ -42,7 +51,11 @@ def ch_track_cue(obj, player_controls, playback, main):
 
 def which_is_close(arr, el):
     """
-    returns an element and its index if it's close to the given element and bigger, returns False and 0 if not
+    returns an element of a given array and its index if it's close to the given element and bigger, returns False and 0 if not
+    Only used with cue sheet to go to the next song, it needs to be bigger otherwise it might change back to the previous song
+    params:
+        arr List[cue.Track]: array to use
+        el Int: element of the array to compare to
     """
     for a in arr:
         if isclose(a.timestamp, el, rel_tol=0.001) and el > a.timestamp:
@@ -53,6 +66,8 @@ def which_is_close(arr, el):
 def playing_icon(ic):
     """
     Switches between play and pause icons
+    params:
+        ic str: current icon
     """
     return "media_player/play" if ic == "media_player/pause" else "media_player/pause"
 
@@ -60,7 +75,15 @@ def playing_icon(ic):
 def ch_playpause(obj, title, album, artist, cover, player_controls, playback):
     """
     Sets the play state and icon of the play/pause icon
-    If the player was stopped, set the audio metadata
+    If the player was stopped, also sets the audio metadata
+    params:
+        obj: widget that called the function
+        title efl.elementary.Label: part of the window that contains the track title
+        album efl.elementary.Label: part of the window that contains the album title
+        artist efl.elementary.Label: part of the window that contains the artist name
+        cover efl.elementary.Photo: part of the window that contains the album cover
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
     """
     if player_controls.stopped:
         if player_controls.play_mode == PLAY_MODES["CUE"]:
@@ -77,6 +100,12 @@ def ch_playpause(obj, title, album, artist, cover, player_controls, playback):
 def stop_player(obj, main, playback, player_controls, time_bar):
     """
     Stops the player and removes the audio metadata display
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControl instance
+        playback efl.Emotion: efl.Emotion instance
+        main MainBoxdisplayPlaying: main container of the window
+        time_bar efl.elementary.Progressbar: progress bar widget
     """
     main.cover.file_set(PLACEHOLDER_IMG)
     play_button = player_controls.play
@@ -95,6 +124,13 @@ def stop_player(obj, main, playback, player_controls, time_bar):
 def set_metadata(title_zone, album_zone, artist_zone, meta, cover):
     """
     Puts the audio metadata in the window
+    params:
+        title_zone efl.elementary.Label: widget that contains the track title
+        album_zone efl.elementary.Label: widget that contains the album title
+        artist_zone efl.elementary.Label: widget that contains the artist name
+        cover efl.elementary.Photo: widget that contains the album cover
+        meta audio_metadata.Format: metadata of a track
+
     """
     # this is very ugly and dumb but for some reasons efl's Image widget with memfile_set wouldn't work so it's the only way I found
     # to display the image from the audio metadata
@@ -117,7 +153,11 @@ def set_metadata(title_zone, album_zone, artist_zone, meta, cover):
 
 def ch_volume(obj, playback, vol = None):
     """
-    Change the volume
+    Changes the volume
+    params:
+        obj: widget that called the function
+        playback efl.Emotion: efl.Emotion instance
+        vol Int: new volume, if None will take the value from the window's slider
     """
     new_vol = obj.value_get() if vol is None else vol
     playback.audio_volume_set(new_vol)
@@ -130,6 +170,12 @@ def ch_volume(obj, playback, vol = None):
 def set_dir(obj, event_info, player_controls, playback, main):
     """
     Sets the current directory and populate the play queue with it
+    params:
+        obj: widget that called the function
+        event_info str: selected directory
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
     """
     player_controls.play_mode = PLAY_MODES["DIR"]
     files = player_utils.filter_files(player_utils.get_all_files(event_info))
@@ -148,6 +194,15 @@ def set_dir(obj, event_info, player_controls, playback, main):
 
 
 def set_cue(obj, event_info, main, playback, player_controls):
+    """
+    Parses a given cue sheet and populates the play queue with it
+    params:
+        obj: widget that called the function
+        event_info: selected file
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
+    """
     if not event_info.endswith(".cue"):
         print("Error: not a cue sheet")
         return
@@ -162,7 +217,34 @@ def set_cue(obj, event_info, main, playback, player_controls):
     main.artist.text_set(cue_info["artist"])
 
 
+def set_playlist(obj, event_info, player_controls, playback, main):
+    """
+    Parses a given playlist file and populates the play queue with it
+    params:
+        obj: widget that called the function
+        event_info str: selected file
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
+    """
+    player_controls.play_mode = PLAY_MODES["PLAYLIST"]
+    pl = player_utils.parse_playlist(event_info)
+    player_controls.player_queue = pl
+    player_controls.current_track = 0
+    playback.file_set(str(player_controls.get_current_track()))
+    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()), main.cover)
+
+
 def add_to_queue(obj, event_info, player_controls, main, playback):
+    """
+    Adds a new file to the play queue
+    params:
+        obj: widget that called the function
+        event_info str: selected file
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
+    """
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         return
     else:
@@ -174,22 +256,25 @@ def add_to_queue(obj, event_info, player_controls, main, playback):
             set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()), main.cover)
 
 
-def set_playlist(obj, event_info, player_controls, playback, main):
-    player_controls.play_mode = PLAY_MODES["PLAYLIST"]
-    pl = player_utils.parse_playlist(event_info)
-    player_controls.player_queue = pl
-    player_controls.current_track = 0
-    playback.file_set(str(player_controls.get_current_track()))
-    set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(player_controls.get_current_track()), main.cover)
-
-
 def format_artists(artist_list):
+    """
+    Format a list of artist into a & separated string
+    params:
+        artist_list List[str]: list of artist names
+    returns:
+        str: & separated string of artists
+    """
     return " & ".join(artist_list)
 
 
 def play_next(obj, player_controls, playback, main):
     """
     play the next track in the queue, stop the player if none after
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
     """
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         try:
@@ -224,6 +309,12 @@ def play_prev(obj, player_controls, playback, main, time_bar):
     play the previous track,
     or go back to the beginning of the current track if
     no track before or at more than 30% of the track
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
+        time_bar efl.elementary.Progressbar: progress bar widget
     """
     if player_controls.play_mode == PLAY_MODES["CUE"]:
         player_controls.current_track -= 1
@@ -257,6 +348,9 @@ def toggle_repeat(obj, player_controls):
     """
     Toggles the repeat state
     In repeat state, the currently playing track will restart when finished
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
     """
     player_controls.repeat.style_set("anchor" if player_controls.repeat.style_get() == "default" else "default")
     player_controls.repeat_mode = not player_controls.repeat_mode
@@ -272,6 +366,10 @@ def toggle_shuffle(obj, player_controls, playback):
     When in shuffle state, the play queue is shuffled,
     when disabling shuffle, the play queue is put back at
     its original state
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
     """
     player_controls.shuffle.style_set("anchor" if player_controls.shuffle.style_get() == "default" else "default")
     if player_controls.play_mode == PLAY_MODES["CUE"]: # no idea how to implement that yet
@@ -300,6 +398,13 @@ def toggle_shuffle(obj, player_controls, playback):
             return
 
 def seek_backward(obj, playback, offset = 10):
+    """
+    Seeks backward in the track, if the position is lower than the offset, go at 0
+    params:
+        obj: widget that called the function
+        playback efl.Emotion: efl.Emotion instance
+        offset: amount of seconds to seek back (default: 10)
+    """
     curr_pos = playback.position_get()
     curr_pos -= offset
     if curr_pos < 0:
@@ -308,6 +413,15 @@ def seek_backward(obj, playback, offset = 10):
         playback.position_set(curr_pos)
 
 def seek_forward(obj, playback, player_controls, main, offset = 10):
+    """
+    Seeks forward in the track, if the position+offset is higher than the duration, play the next track
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
+        playback efl.Emotion: efl.Emotion instance
+        main efl.MainBoxDisplayPlaying: main container of the window
+        offset: amount of seconds to seek forward (default: 10)
+    """
     curr_pos = playback.position_get()
     curr_pos += offset
     if curr_pos > playback.play_length_get():
@@ -336,6 +450,10 @@ def reorder_queue(obj, a, player_controls):
     """
     Updates the order of the play queue after a
     track in the list has been moved
+    params:
+        obj: widget that called the function
+        a: mystery required argument that doesn't appear in the docs (seriously what)
+        player_controls PlayerControls: PlayerControls instance
     """
     curr_track = player_controls.get_current_track()
     new_list = []
@@ -348,6 +466,9 @@ def reorder_queue(obj, a, player_controls):
 def sh_queue(obj, player_controls):
     """
     Displays a window containing the play queue
+    params:
+        obj: widget that called the function
+        player_controls PlayerControls: PlayerControls instance
     """
     list_item = None
     list_item_playing = None
@@ -372,4 +493,7 @@ def sh_queue(obj, player_controls):
 
 
 def custom_filter_cue(is_dir, path, data):
+    """
+    Unused because custom filters don't seem to work properly
+    """
     return not is_dir and path.endswith(".cue")
