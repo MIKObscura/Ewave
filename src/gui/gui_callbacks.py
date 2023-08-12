@@ -1,8 +1,7 @@
 from efl.elementary import StandardWindow, Icon, Genlist, GenlistItemClass
 from efl.elementary import ELM_GENLIST_ITEM_NONE
 from efl.emotion import Emotion
-from binascii import b2a_hex
-from os import urandom, path
+from os import path
 from math import isclose
 from random import sample
 from pathlib import Path
@@ -99,7 +98,7 @@ def set_metadata(title_zone, album_zone, artist_zone, meta, cover):
     """
     # this is very ugly and dumb but for some reasons efl's Image widget with memfile_set wouldn't work so it's the only way I found
     # to display the image from the audio metadata
-    tmp_filename_bin = path.join(path.abspath("/tmp"), F"{b2a_hex(urandom(10)).decode('ascii')}.bin")
+    tmp_filename_bin = path.join(path.abspath("/tmp"), "album_art.jpeg")
     try:
         cover_data = meta["pictures"][0].data
         with open(tmp_filename_bin, "wb") as raw_img:
@@ -116,11 +115,11 @@ def set_metadata(title_zone, album_zone, artist_zone, meta, cover):
     artist_zone.text_set(format_artists(meta['tags'].artist))
 
 
-def ch_volume(obj, playback):
+def ch_volume(obj, playback, vol = None):
     """
     Change the volume
     """
-    new_vol = obj.value_get()
+    new_vol = obj.value_get() if vol is None else vol
     playback.audio_volume_set(new_vol)
     if new_vol == 0:
         obj.content_get().standard_set("audio-volume-muted")
@@ -300,17 +299,17 @@ def toggle_shuffle(obj, player_controls, playback):
         except TypeError: # happens when the list is empty
             return
 
-def seek_backward(obj, playback):
+def seek_backward(obj, playback, offset = 10):
     curr_pos = playback.position_get()
-    curr_pos -= 10
+    curr_pos -= offset
     if curr_pos < 0:
         playback.position_set(0)
     else:
         playback.position_set(curr_pos)
 
-def seek_forward(obj, playback, player_controls, main):
+def seek_forward(obj, playback, player_controls, main, offset = 10):
     curr_pos = playback.position_get()
-    curr_pos += 10
+    curr_pos += offset
     if curr_pos > playback.play_length_get():
         play_next(obj, player_controls, playback, main)
     else:

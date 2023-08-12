@@ -5,16 +5,7 @@ from pathlib import Path
 EXTENSIONS = ["mp3", "flac", "ogg", "wav"] # will be expanded in the future
 
 """
-# basically C/C++ structs but in Python, currently unused but may be useful in the future
-@dataclass
-class Album:
-    name: str
-    tracklist: list[Track] = field(default_factory=list)
-
-@dataclass
-class Artist:
-    name: str
-    albums: list[Album] = field(default_factory=list)
+General utilities for the program
 """
 
 def get_metadata(path):
@@ -49,3 +40,15 @@ def parse_playlist(file):
         return []
     except IOError:
         return []
+
+def time_string_to_us(string):
+    """
+    Converts a time string formatted like this: hour:minutes:seconds to microseconds
+    """
+    parts = string.split(':')
+    if len(parts) == 2:
+        return (int(parts[0]) * 60000000) + (int(parts[1] * 1000000))
+    elif len(parts) == 3:
+        return (int(parts[0] * 3600000000)) + (int(parts[1]) * 60000000) + (int(parts[2] * 1000000))
+    else:
+        return int(parts[0]) * 1000000

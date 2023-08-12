@@ -84,4 +84,4 @@ def init_gui():
     bottom.pack_end(player_controls)
     vbx.pack_end(bottom)
     win.show()
-    return {"playback": playback, "player_controls": player_controls, "main": main} # return them so they can be used elsewehere
+    return {"playback": playback, "player_controls": player_controls, "main": main, "time_bar": time_bar} # return them so they can be used elsewehere
