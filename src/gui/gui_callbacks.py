@@ -420,7 +420,7 @@ def seek_forward(obj, playback, player_controls, main, offset = 10):
         player_controls PlayerControls: PlayerControls instance
         playback efl.Emotion: efl.Emotion instance
         main efl.MainBoxDisplayPlaying: main container of the window
-        offset: amount of seconds to seek forward (default: 10)
+        offset int: amount of seconds to seek forward (default: 10)
     """
     curr_pos = playback.position_get()
     curr_pos += offset
@@ -428,6 +428,20 @@ def seek_forward(obj, playback, player_controls, main, offset = 10):
         play_next(obj, player_controls, playback, main)
     else:
         playback.position_set(curr_pos)
+
+def ch_position(playback, position):
+    """
+    Changes the position to an arbitrary position in the track,
+    does nothing if the given position is higher than the duration
+    or lower than 0
+    params:
+        playback efl.Emotion: efl.Emotion instance
+        player_controls PlayerControls: PlayerControls isntance
+        position int: position in the track to jump to
+    """
+    if position >= playback.play_length_get() or position < 0 or not isinstance(position, int):
+        return
+    playback.position_set(postition)
 
 
 def glic_text_get(obj, part, item_data):

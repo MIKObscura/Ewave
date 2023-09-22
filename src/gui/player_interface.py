@@ -42,12 +42,15 @@ class PlayerInterface():
     def get_tracklist(self):
         return self.__player_controls.player_queue
 
+    def set_position(self, position):
+        gui_callbacks.ch_position(self.__playback, position)
+
     def get_metadata(self):
         meta = get_metadata(self.__playback.file_get())
         return {
             "mpris:trackid": meta["tags"].tracknumber[0],
             "mpris:length": time_string_to_us(meta["streaminfo"].duration),
-            "mpris:artUrl": "file:///tmp/album_art.bin",
+            "mpris:artUrl": "file:///tmp/album_art.jpeg",
             "xesam:album": meta["tags"].album[0],
             "xesam:albumArtist": meta["tags"].albumartist,
             "xesam:artist": meta["tags"].artist,

@@ -21,9 +21,11 @@ Initialize everything
 """
 def init_gui():
     win = MainWindow()
-    playback = Emotion(win.evas, module_name="vlc")
-
     vbx = Box(win, size_hint_weight=evas.EXPAND_BOTH)
+    main = MainBoxDisplayPlaying(vbx)
+    playback = Emotion(win.evas, module_name="vlc")
+    player_controls = PlayerController(vbx)
+
     win.resize_object_add(vbx)
     vbx.show()
     #### Header Box #####
@@ -31,7 +33,7 @@ def init_gui():
     fs = FSButton(parent=header, style="anchor", text="Select folder", folder_only=True)
     cue_fs = FSButton(parent=header, style="anchor", text="Select cue")
     playlist_fs = FSButton(parent=header, style="anchor", text="Select playlist")
-    playlist_fs.callback_file_chosen_add(set_playlist)
+    playlist_fs.callback_file_chosen_add(set_playlist, player_controls, playback, main)
     queue_add = FSButton(parent=header, style="anchor", text="Add file to queue", multi_select=True) # multi_select doesn't seem to work
     queue_viewer = Button(header, text="View queue")
     header.pack_end(fs)
@@ -48,7 +50,6 @@ def init_gui():
     header.show()
 
     #### Main Box #####
-    main = MainBoxDisplayPlaying(vbx)
     vbx.pack_start(main)
 
     bottom = Box(vbx, size_hint_weight=evas.EXPAND_HORIZ, size_hint_align=evas.FILL_HORIZ, padding=(0, 30))
@@ -58,9 +59,6 @@ def init_gui():
     time_bar = Progressbar(vbx, horizontal=True, value=0, size_hint_align=evas.FILL_HORIZ, size_hint_weight=evas.EXPAND_BOTH)
     time_bar.show()
     bottom.pack_end(time_bar)
-
-    #### Player Buttons ####
-    player_controls = PlayerController(vbx)
 
     # add all the callbacks
     player_controls.volume.callback_changed_add(ch_volume, playback)
