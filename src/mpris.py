@@ -13,7 +13,7 @@ LOOP_STATUS = ["None", "Track", "Playlist"]
 
 SESSION_BUS = SessionMessageBus()
 MPRIS_NAMESPACE = ("org", "freedesktop", "MediaPlayer2")
-MPRIS2 = DBusServiceIdentifier(
+MPRIS2_SERVICE = DBusServiceIdentifier(
     namespace=MPRIS_NAMESPACE,
     basename="ewave",
     message_bus=SESSION_BUS
@@ -31,7 +31,7 @@ PLAYLIST_SERVICE = DBusInterfaceIdentifier(
     basename="Playlists"
 )
 
-@dbus_interface(MPRIS2.interface_name)
+@dbus_interface(MPRIS2_SERVICE.interface_name)
 class MPRIS2Interface(InterfaceTemplate):
     pass
 
