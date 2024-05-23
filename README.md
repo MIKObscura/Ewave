@@ -1,5 +1,5 @@
 # Ewave
-![screenshot](https://cdn.discordapp.com/attachments/1045329788295983137/1097537931956191313/image.png)
+![screenshot](screenshot.png)
 This is a basic EFL based music player. Nothing fancy, just pick files/directories and play!
 For now it's still in early development so it only has the basics of a music player.
 To use it, launch `src/main.py` with your python interpreter, then click on one of the buttons in the top right to pick an option to populate the play queue, there are 4 at the moment:
