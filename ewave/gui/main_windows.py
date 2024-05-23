@@ -3,7 +3,7 @@ import efl.evas as evas
 from os import path
 from efl.elementary import exit as elm_exit
 
-PLACEHOLDER_IMG = path.abspath("src/gui/img/202377.png")
+PLACEHOLDER_IMG = path.abspath("ewave/gui/img/202377.png")
 class MetaTextDisplay(Label):
     def __init__(self, parent, text) -> None:
         super().__init__(parent, text=text, size_hint_weight=evas.EXPAND_BOTH, size_hint_align=evas.FILL_HORIZ, scale=2, style="marker", wrap_width=400, line_wrap=ELM_WRAP_WORD)

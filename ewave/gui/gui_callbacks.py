@@ -5,10 +5,10 @@ from os import path
 from math import isclose
 from random import sample
 from pathlib import Path
-import utils.player_utils as player_utils
-import utils.cue as cue
-from gui.main_windows import PLACEHOLDER_IMG
-from gui.player_controls import PLAY_MODES
+import ewave.utils.player_utils as player_utils
+import ewave.utils.cue as cue
+from ewave.gui.main_windows import PLACEHOLDER_IMG
+from ewave.gui.player_controls import PLAY_MODES
 
 def ch_progress(obj, playback, time_bar):
     """
@@ -69,7 +69,7 @@ def playing_icon(ic):
     params:
         ic str: current icon
     """
-    return "media_player/play" if ic == "media_player/pause" else "media_player/pause"
+    return "media-playback-start" if ic == "media-playback-pause" else "media-playback-pause"
 
 
 def ch_playpause(obj, title, album, artist, cover, player_controls, playback):
@@ -110,7 +110,7 @@ def stop_player(obj, main, playback, player_controls, time_bar):
     main.cover.file_set(PLACEHOLDER_IMG)
     play_button = player_controls.play
     player_controls.stopped = True
-    play_button.content_get().standard_set("media_player/play")
+    play_button.content_get().standard_set("media-playback-start")
     main.title.text_set("Nothing playing!")
     main.album.text_set(" ")
     main.artist.text_set(" ")
@@ -164,7 +164,7 @@ def ch_volume(obj, playback, vol = None):
     if new_vol == 0:
         obj.content_get().standard_set("audio-volume-muted")
     elif new_vol != 0 and obj.content_get().standard_get() == "audio-volume-muted":
-        obj.content_get().standard_set("audio-volume")
+        obj.content_get().standard_set("audio-volume-high")
 
 
 def set_dir(obj, event_info, player_controls, playback, main):
@@ -283,7 +283,7 @@ def play_next(obj, player_controls, playback, main):
             new_time = player_controls.get_current_track().timestamp
             new_artist = player_controls.get_current_track().artists
             playback.position_set(new_time)
-            player_controls.play.content_get().standard_set("media_player/pause")
+            player_controls.play.content_get().standard_set("media-playerback-pause")
             playback.play_set(True)
             main.title.text_set(new_track)
             main.artist.text_set(format_artists(new_artist))
@@ -298,7 +298,7 @@ def play_next(obj, player_controls, playback, main):
             new_track = player_controls.get_current_track()
             playback.file_set(str(new_track))
             set_metadata(main.title, main.album, main.artist, player_utils.get_metadata(new_track), main.cover)
-            player_controls.play.content_get().standard_set("media_player/pause")
+            player_controls.play.content_get().standard_set("media-playerback-pause")
             playback.play_set(True)
         except IndexError:
             stop_player(obj)
@@ -322,7 +322,7 @@ def play_prev(obj, player_controls, playback, main, time_bar):
         prev_timestamp = player_controls.get_current_track().timestamp
         prev_artist = player_controls.get_current_track().artists
         playback.position_set(prev_timestamp)
-        player_controls.play.content_get().standard_set("media_player/pause")
+        player_controls.play.content_get().standard_set("media-playerback-pause")
         playback.play_set(True)
         main.title.text_set(prev_track)
         main.artist.text_set(format_artists(prev_artist))
@@ -333,7 +333,7 @@ def play_prev(obj, player_controls, playback, main, time_bar):
             return
         player_controls.current_track -= 1
         prev_track = None
-        player_controls.play.content_get().standard_set("media_player/pause")
+        player_controls.play.content_get().standard_set("media-playerback-pause")
         playback.play_set(True)
         try:
             prev_track = player_controls.get_current_track()
@@ -458,7 +458,7 @@ def glic_content_get(obj, part, item_data):
     return Icon(obj, standard="media-record")
 
 def glic_content_get_playing(obj, part, item_data):
-    return Icon(obj, standard="media_player/play")
+    return Icon(obj, standard="media-playback-start")
 
 def reorder_queue(obj, a, player_controls):
     """

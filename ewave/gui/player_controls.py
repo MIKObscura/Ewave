@@ -13,31 +13,31 @@ class PlayerController(Box):
 
         # Elements
         # Seek backwards
-        ic_seek_back = Icon(self, standard="media_player/rewind")
+        ic_seek_back = Icon(self, standard="media-seek-backward")
         self.seek_back = Button(self, content=ic_seek_back, scale=2)
         self.pack_end(self.seek_back)
         # Previous
-        ic_prev = Icon(self, standard="media_player/prev")
+        ic_prev = Icon(self, standard="media-skip-backward")
         self.prev = Button(self, content=ic_prev, scale=2)
         self.pack_end(self.prev)
 
         # Play/Pause
-        ic_play = Icon(self, standard="media_player/play")
+        ic_play = Icon(self, standard="media-playback-start")
         self.play = Button(self, content=ic_play, scale=2)
         self.pack_end(self.play)
 
         # Next
-        ic_next = Icon(self, standard="media_player/next")
+        ic_next = Icon(self, standard="media-skip-forward")
         self.b_next = Button(self, content=ic_next, scale=2)
         self.pack_end(self.b_next)
 
         # Seek forward
-        ic_seek_for = Icon(self, standard="media_player/forward")
+        ic_seek_for = Icon(self, standard="media-seek-forward")
         self.seek_for = Button(self, content=ic_seek_for, scale=2)
         self.pack_end(self.seek_for)
 
         # Stop
-        ic_stop = Icon(self, standard="media_player/stop")
+        ic_stop = Icon(self, standard="media-playback-stop")
         self.stop = Button(self, content=ic_stop, scale=2)
         self.pack_end(self.stop)
 
@@ -52,7 +52,7 @@ class PlayerController(Box):
         self.pack_end(self.shuffle)
 
         # Volume Slider
-        ic_volume = Icon(self, standard="audio-volume")
+        ic_volume = Icon(self, standard="audio-volume-high")
         self.volume = Slider(self, horizontal=True, span_size=150, value=1.0, content=ic_volume, scale=1.5)
         self.pack_end(self.volume)
 

@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
-from gui.gui_callbacks import set_metadata, set_dir, set_cue, set_playlist
-import utils.player_utils as player_utils
+from ewave.gui.gui_callbacks import set_metadata, set_dir, set_cue, set_playlist
+import ewave.utils.player_utils as player_utils
 
 def select_files_cli(args, widgets):
     widgets["player_controls"].player_queue = args

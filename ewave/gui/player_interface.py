@@ -1,5 +1,5 @@
-import gui.gui_callbacks
-from utils.player_utils import get_metadata, time_string_to_us
+import ewave.gui.gui_callbacks
+from ewave.utils.player_utils import get_metadata, time_string_to_us
 import datetime
 
 class PlayerInterface():
