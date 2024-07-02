@@ -15,37 +15,43 @@ def parse_cue(file):
     album = None
     artist = None
     tracks = []
+    result = {}
     try:
-        with open(file, "r") as cue:
-            parts = split(r"FILE \"([^\"]*)\" [a-zA-Z]*", cue.read())
-            header = parts[0]
-            audio_file = parts[1]
-            tracks_info = split(r"\s{2}TRACK [0-9]{2} AUDIO\n" , parts[2])
-            for i in header.split('\n'):
-                if i.startswith("PERFORMER"):
-                    artist = findall(r'"([^"]*)"', i)[0]
-                if i.startswith("TITLE"):
-                    album = findall(r'"([^"]*)"', i)[0]
-            for t in tracks_info:
-                new_track = Track(None, None)
-                for i in t.split("\n"):
-                    if i.strip().startswith("TITLE"):
-                        new_track.title = findall(r'"([^"]*)"', i)[0]
-                        continue
-                    if i.strip().startswith("PERFORMER"):
-                        new_track.artists.append(findall(r'"([^"]*)"', i)[0])
-                        continue
-                    if i.strip().startswith("INDEX 01"): # other indexes exist but they only indicate pregap and postgap
-                        new_track.timestamp = strtime_to_sec(i.strip())
-                if len(new_track.artists) == 0: # it means no track has a specific artist so we just use the one in the header
-                    new_track.artists.append(artist)
-                if new_track.title is not None: # sometimes empty whitespaces slide in so we don't want them in the list
-                    tracks.append(new_track)
+        cue = open(file, "r", errors="ignore")
+        current_track = 0
+        for line in cue.readlines():
+            print(line)
+            tokens = line.strip().split(" ")
+            if tokens[0] == "REM": # comment
+                continue
+            elif tokens[0] == "FILE":
+                result["file"] = " ".join(tokens[1:-1]).replace('"', '').strip()
+                continue
+            elif tokens[0] == "PERFORMER":
+                if "albumartist" not in result:
+                    result["albumartist"] = " ".join(tokens[1:]).replace('"', '').strip()
+                else:
+                    tracks[current_track].artists.append(" ".join(tokens[1:]).replace('"', '').strip())
+                continue
+            elif tokens[0] == "TITLE":
+                if "album" not in result:
+                    result["album"] = " ".join(tokens[1:]).replace('"', '').strip()
+                else:
+                    tracks[current_track].title = " ".join(tokens[1:]).replace('"', '').strip()
+                continue
+            elif tokens[0] == "INDEX" and tokens[1] == "01":
+                tracks[current_track].timestamp = strtime_to_sec(tokens[2])
+                continue
+            elif tokens[0] == "TRACK":
+                current_track = int(tokens[1]) - 1
+                tracks.append(Track(None, None))
+                continue
+        result["tracklist"] = tracks
     except FileNotFoundError:
         pass
-    return {"file": audio_file, "tracklist": tracks, "album": album, "artist": artist}
 
-def strtime_to_sec(time):
-    timestamp = time.split(" ")[2]
+    return result
+
+def strtime_to_sec(timestamp):
     mins, sec, frames = timestamp.split(":")
     return (60 * int(mins)) + int(sec) + (int(frames) / 75)

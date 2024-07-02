@@ -214,7 +214,10 @@ def set_cue(obj, event_info, main, playback, player_controls):
     player_controls.current_track = 0
     main.title.text_set(player_controls.get_current_track().title)
     main.album.text_set(cue_info["album"])
-    main.artist.text_set(cue_info["artist"])
+    if len(player_controls.get_current_track().artists) == 0:
+        main.artist.text_set(cue_info["albumartist"])
+    else:
+        main.artist.text_set("&".join(player_controls.get_current_track().artists))
 
 
 def set_playlist(obj, event_info, player_controls, playback, main):
