@@ -1,5 +1,6 @@
 from re import findall, split
 from dataclasses import dataclass, field
+import os
 
 @dataclass
 class Track:
@@ -16,12 +17,23 @@ def parse_cue(file):
     artist = None
     tracks = []
     result = {}
+    multi_file = False # cue sheets with multiple FILE are not handled currently, so it will just return a list of the files instead
+    files_in_cue = open(file, "r", errors="ignore").read().count("FILE")
     try:
+        if files_in_cue == 0:
+            return None
+        if files_in_cue > 1:
+            multi_file = True
         cue = open(file, "r", errors="ignore")
         current_track = 0
         for line in cue.readlines():
-            print(line)
             tokens = line.strip().split(" ")
+            if multi_file:
+                if tokens[0] == "FILE":
+                    tracks.append(os.path.dirname(file) + "/" + " ".join(tokens[1:-1]).replace('"', '').strip())
+                if len(tracks) == files_in_cue:
+                    return tracks
+                continue
             if tokens[0] == "REM": # comment
                 continue
             elif tokens[0] == "FILE":
@@ -49,8 +61,15 @@ def parse_cue(file):
         result["tracklist"] = tracks
     except FileNotFoundError:
         pass
-
     return result
+
+def get_linked_file(file):
+    cue = open(file, "r", errors="ignore")
+    for line in cue.readlines():
+        tokens = line.strip().split(" ")
+        if tokens[0] == "FILE":
+            return " ".join(tokens[1:-1]).replace('"', '')
+    return None
 
 def strtime_to_sec(timestamp):
     mins, sec, frames = timestamp.split(":")
